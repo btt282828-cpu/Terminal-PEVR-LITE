@@ -1706,7 +1706,7 @@
 {
 "date": "2026-07-31",
 "tag": "0/3",
-"sym": "URA",
+"sym": "SLV",
 "dir": 1
 },
 {
@@ -1718,13 +1718,13 @@
 {
 "date": "2026-07-31",
 "tag": "SUELO",
-"sym": "COPX",
+"sym": "URA",
 "dir": 1
 },
 {
 "date": "2026-07-31",
 "tag": "SUELO",
-"sym": "URA",
+"sym": "IBIT",
 "dir": 1
 },
 {

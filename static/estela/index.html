@@ -1,73 +1,561 @@
-name: Terminal PeVR
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>La Estela — Radar de rotación sectorial</title>
+<meta name="description" content="Dónde está entrando el dinero antes de que sea titular. Rotación sectorial semanal con el marcador completo, fallos incluidos.">
+<meta property="og:title" content="La Estela — Radar de rotación sectorial">
+<meta property="og:description" content="El flujo confirma, la narrativa propone.">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink-0:#090B10;--ink-1:#0F131B;--ink-2:#151A24;--ink-3:#1B212C;
+  --line:#1D2430;--line-2:#2A3342;
+  --tx-0:#E9ECF1;--tx-1:#98A3B4;--tx-2:#5F6A7B;
+  --brass:#C8973F;--brass-dim:#4A3A1C;--teal:#4E9E86;--teal-dim:#16302A;
+  --clay:#B85A55;--clay-dim:#33191A;--slate:#5B7794;
+  --sp-1:4px;--sp-2:8px;--sp-3:12px;--sp-4:16px;--sp-5:24px;--sp-6:40px;--sp-7:64px;
+  --r-s:6px;--r-m:10px;--r-l:14px;--rail:64px;--read:380px;
+  --e:cubic-bezier(.22,.61,.36,1);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--ink-0);color:var(--tx-0);font-family:'IBM Plex Sans',system-ui,sans-serif;
+  font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;overflow:hidden}
+.mono{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums}
+::selection{background:var(--brass-dim);color:var(--tx-0)}
+:focus-visible{outline:2px solid var(--brass);outline-offset:2px;border-radius:var(--r-s)}
+.pos{color:var(--teal)}.neg{color:var(--clay)}.neu{color:var(--tx-2)}
 
-# Cuando se ejecuta:
-#   - a mano, desde la pestana Actions (boton "Run workflow")
-#   - automatico los viernes a las 22:00 UTC (cierre de Nueva York + margen para que
-#     Yahoo consolide los datos del dia). El cierre del viernes es el unico disparador
-#     del sistema, asi que el resto de la semana no hace falta.
-on:
-  workflow_dispatch:
-  schedule:
-    - cron: "0 22 * * 5"
+.shell{display:grid;grid-template-columns:var(--rail) 1fr;height:100vh}
+.rail{background:var(--ink-1);border-right:1px solid var(--line);display:flex;flex-direction:column;
+  align-items:center;padding:var(--sp-4) 0;gap:var(--sp-2)}
+.logo{width:34px;height:34px;border-radius:9px;background:var(--ink-3);border:1px solid var(--line-2);
+  display:grid;place-items:center;margin-bottom:var(--sp-5)}
+.logo svg{width:22px;height:22px}
+.navbtn{width:40px;height:40px;border-radius:9px;border:0;background:transparent;color:var(--tx-2);
+  display:grid;place-items:center;cursor:pointer;position:relative;transition:color .16s var(--e),background .16s var(--e)}
+.navbtn:hover{color:var(--tx-1);background:var(--ink-2)}
+.navbtn[aria-current="true"]{color:var(--brass);background:var(--ink-2)}
+.navbtn[aria-current="true"]::before{content:'';position:absolute;left:-12px;top:11px;width:2px;height:18px;
+  background:var(--brass);border-radius:2px}
+.navbtn svg{width:19px;height:19px;stroke-width:1.6;fill:none;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round}
+.rail .spacer{flex:1}
+.tip{position:absolute;left:52px;background:var(--ink-3);border:1px solid var(--line-2);color:var(--tx-0);
+  padding:5px 9px;border-radius:var(--r-s);font-size:12px;white-space:nowrap;pointer-events:none;
+  opacity:0;transform:translateX(-4px);transition:.14s var(--e);z-index:60}
+.navbtn:hover .tip{opacity:1;transform:translateX(0)}
+.tip kbd{margin-left:6px;color:var(--tx-2)}
 
-# Permisos: escribir en el repo (para guardar el historico actualizado) y publicar en Pages.
-permissions:
-  contents: write
-  pages: write
-  id-token: write
+.app{display:flex;flex-direction:column;min-width:0;height:100vh}
+.cinta{height:56px;flex:0 0 56px;border-bottom:1px solid var(--line);background:var(--ink-1);
+  display:flex;align-items:center;gap:var(--sp-5);padding:0 var(--sp-5)}
+.estado{display:flex;align-items:center;gap:var(--sp-3);min-width:0}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--brass);flex:0 0 7px}
+.estado b{font-size:14px;font-weight:600}
+.estado .sub{color:var(--tx-2);font-size:12px;border-left:1px solid var(--line-2);padding-left:var(--sp-3);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cinta .sep{width:1px;height:22px;background:var(--line);flex:0 0 1px}
+.reloj{display:flex;align-items:center;gap:var(--sp-3)}
+.reloj .lbl{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--tx-2)}
+.dias{display:flex;gap:3px}
+.dia{width:26px;height:22px;border-radius:4px;background:var(--ink-2);border:1px solid var(--line);
+  display:grid;place-items:center;font-size:10px;color:var(--tx-2);font-family:'IBM Plex Mono',monospace}
+.dia.pasado{color:var(--tx-1);background:var(--ink-3)}
+.dia.hoy{border-color:var(--brass);color:var(--brass);background:var(--brass-dim)}
+.dia.decide{border-color:var(--line-2);color:var(--tx-1)}
+.reloj .txt{font-size:12px;color:var(--tx-1);white-space:nowrap}
+.cinta .right{margin-left:auto;display:flex;align-items:center;gap:var(--sp-3)}
+.kbtn{background:var(--ink-2);border:1px solid var(--line);color:var(--tx-1);border-radius:var(--r-s);
+  padding:6px 10px;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:7px;
+  font-family:inherit;transition:.14s var(--e);white-space:nowrap}
+.kbtn:hover{border-color:var(--line-2);color:var(--tx-0)}
+kbd{font-family:'IBM Plex Mono',monospace;font-size:10.5px;background:var(--ink-3);
+  border:1px solid var(--line-2);border-bottom-width:2px;border-radius:4px;padding:1px 5px;color:var(--tx-1)}
 
-# Si se lanzan dos a la vez, que no se pisen.
-concurrency:
-  group: terminal
-  cancel-in-progress: false
+.board{flex:1;display:grid;grid-template-columns:1fr var(--read);min-height:0}
+.center{overflow-y:auto;padding:var(--sp-5) var(--sp-5) var(--sp-7);min-width:0}
+.center::-webkit-scrollbar,.read::-webkit-scrollbar{width:10px}
+.center::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:8px;border:3px solid var(--ink-0)}
+.read::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:8px;border:3px solid var(--ink-1)}
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Descargar el repositorio
-        uses: actions/checkout@v4
+.eyebrow{display:flex;align-items:baseline;gap:var(--sp-3);margin-bottom:var(--sp-4);flex-wrap:wrap}
+.eyebrow h1{font-size:15px;font-weight:600;letter-spacing:-.01em}
+.eyebrow .q{font-family:'IBM Plex Serif',serif;font-style:italic;color:var(--tx-2);font-size:13px}
+.eyebrow .n{margin-left:auto;font-size:11px;color:var(--tx-2);font-family:'IBM Plex Mono',monospace}
 
-      - name: Preparar Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
+.rejilla{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--sp-3);align-items:start}
+.anden{background:var(--ink-1);border:1px solid var(--line);border-radius:var(--r-m);overflow:hidden}
+.anden.foco{border-color:var(--brass-dim);background:linear-gradient(180deg,#14120C,var(--ink-1) 120px)}
+.anden-h{padding:var(--sp-3) var(--sp-4);border-bottom:1px solid var(--line);display:flex;
+  align-items:center;gap:8px;flex-wrap:wrap}
+.anden-h .mark{width:6px;height:6px;border-radius:1px;transform:rotate(45deg)}
+.anden-h .t{font-size:11px;letter-spacing:.1em;text-transform:uppercase;font-weight:600}
+.anden-h .c{margin-left:auto;font-size:11px;color:var(--tx-2);font-family:'IBM Plex Mono',monospace}
+.anden-h .d{font-size:11px;color:var(--tx-2);width:100%;margin-top:2px}
+.anden-b{padding:var(--sp-2);display:flex;flex-direction:column;gap:2px;min-height:76px}
+.ficha{width:100%;text-align:left;background:transparent;border:1px solid transparent;border-radius:var(--r-s);
+  padding:9px 10px;cursor:pointer;display:grid;grid-template-columns:1fr auto;gap:2px var(--sp-3);
+  align-items:center;font-family:inherit;color:inherit;transition:background .14s var(--e),border-color .14s var(--e)}
+.ficha:hover{background:var(--ink-2);border-color:var(--line)}
+.ficha[aria-selected="true"]{background:var(--ink-2);border-color:var(--line-2)}
+.ficha .tk{font-size:13.5px;font-weight:600;font-family:'IBM Plex Mono',monospace}
+.ficha .nm{grid-column:1;font-size:11px;color:var(--tx-2);line-height:1.3}
+.ficha .estela{grid-column:2;grid-row:1/3;width:56px;height:24px;opacity:.85}
+.ficha .cmf{font-size:11px;font-family:'IBM Plex Mono',monospace}
+.vacio{padding:var(--sp-4);font-size:12px;color:var(--tx-2);font-family:'IBM Plex Serif',serif;
+  font-style:italic;line-height:1.6}
 
-      - name: Ejecutar el terminal
-        env:
-          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
-        run: python rotacion.py
+.bloque{margin-top:var(--sp-6)}
+.tabla{width:100%;border-collapse:collapse}
+.tabla th{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--tx-2);font-weight:600;
+  text-align:left;padding:0 var(--sp-3) var(--sp-2);border-bottom:1px solid var(--line);white-space:nowrap}
+.tabla th.r,.tabla td.r{text-align:right}
+.tabla td{padding:11px var(--sp-3);border-bottom:1px solid var(--line);font-size:13px}
+.tabla tbody tr{transition:background .12s var(--e);cursor:pointer}
+.tabla tbody tr:hover{background:var(--ink-1)}
+.tabla .tk{font-family:'IBM Plex Mono',monospace;font-weight:600}
+.tabla .sub{font-size:11px;color:var(--tx-2)}
+.tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
 
-      - name: Guardar el historico actualizado
-        # El programa reescribe historico_seguimiento_NO_BORRAR en cada ejecucion
-        # (fichas, marcador, libro). Sin este paso se perderia al terminar la maquina.
-        run: |
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
-          git add historico_seguimiento_NO_BORRAR || true
-          if git diff --staged --quiet; then
-            echo "Sin cambios en el historico."
-          else
-            git commit -m "historico $(date -u +%Y-%m-%d)"
-            git pull --rebase --autostash || true
-            git push
-          fi
+.chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:2px 8px;border-radius:20px;
+  background:var(--ink-2);border:1px solid var(--line);color:var(--tx-1);white-space:nowrap}
+.chip.brass{color:var(--brass);border-color:var(--brass-dim);background:#17130A}
+.chip.teal{color:var(--teal);border-color:var(--teal-dim);background:#0C1613}
+.chip.clay{color:var(--clay);border-color:var(--clay-dim);background:#170D0D}
+.barra{height:4px;border-radius:2px;background:var(--ink-3);overflow:hidden;width:110px;
+  display:inline-block;vertical-align:middle}
+.barra i{display:block;height:100%;border-radius:2px}
 
-      - name: Preparar la publicacion
-        uses: actions/configure-pages@v5
+.read{border-left:1px solid var(--line);background:var(--ink-1);overflow-y:auto;padding:var(--sp-5);
+  display:flex;flex-direction:column;gap:var(--sp-4)}
+.read-h{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--sp-3)}
+.read-h .tk{font-family:'IBM Plex Mono',monospace;font-size:24px;font-weight:600;letter-spacing:-.02em;line-height:1.1}
+.read-h .nm{font-size:12px;color:var(--tx-2);margin-top:2px}
+.lectura{font-family:'IBM Plex Serif',serif;font-size:14.5px;line-height:1.65;color:var(--tx-0);
+  border-left:2px solid var(--brass-dim);padding-left:var(--sp-4)}
+.kv{display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-2)}
+.kv>div{background:var(--ink-2);border:1px solid var(--line);border-radius:var(--r-s);padding:9px 11px}
+.kv .k{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--tx-2)}
+.kv .v{font-size:15px;font-weight:600;font-family:'IBM Plex Mono',monospace;margin-top:3px}
+.sect{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--tx-2);font-weight:600}
+.huellas{display:flex;flex-wrap:wrap;gap:5px}
+.inval{background:var(--ink-2);border:1px solid var(--line);border-left:2px solid var(--clay);
+  border-radius:var(--r-s);padding:11px 13px;font-size:12.5px;color:var(--tx-1);line-height:1.55}
+.inval b{display:block;font-size:9.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--clay);margin-bottom:4px}
+.estelaGr{width:100%;height:90px;background:var(--ink-2);border:1px solid var(--line);border-radius:var(--r-s)}
 
-      - name: Empaquetar la web
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: site/estela
+.btn{border:1px solid var(--line-2);background:var(--ink-2);color:var(--tx-0);border-radius:var(--r-s);
+  padding:9px 14px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;transition:.14s var(--e);
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;text-decoration:none}
+.btn:hover{background:var(--ink-3)}
+.btn.pri{background:var(--brass);border-color:var(--brass);color:#0E0B04;font-weight:600}
+.btn.pri:hover{background:#D9A94F}
+.btn.gh{background:transparent;border-color:var(--line)}
 
-  publicar:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
-    steps:
-      - name: Publicar en GitHub Pages
-        id: deploy
-        uses: actions/deploy-pages@v4
+.velo{position:fixed;inset:0;background:#050709CC;backdrop-filter:blur(3px);z-index:100;
+  display:none;align-items:flex-start;justify-content:center;padding-top:14vh}
+.velo.on{display:flex;animation:fade .14s var(--e)}
+@keyframes fade{from{opacity:0}}
+.modal{width:min(560px,92vw);background:var(--ink-1);border:1px solid var(--line-2);border-radius:var(--r-l);
+  box-shadow:0 24px 64px #000000B3;overflow:hidden;animation:rise .18s var(--e)}
+@keyframes rise{from{opacity:0;transform:translateY(-8px)}}
+.modal input{width:100%;background:transparent;border:0;border-bottom:1px solid var(--line);color:var(--tx-0);
+  padding:var(--sp-4) var(--sp-5);font-size:15px;font-family:inherit;outline:0}
+.modal input::placeholder{color:var(--tx-2)}
+.cmds{max-height:340px;overflow-y:auto;padding:var(--sp-2)}
+.cmd{display:flex;align-items:center;gap:var(--sp-3);padding:10px var(--sp-3);border-radius:var(--r-s);
+  cursor:pointer;font-size:13.5px}
+.cmd:hover,.cmd.sel{background:var(--ink-2)}
+.cmd .tkk{font-family:'IBM Plex Mono',monospace;font-weight:600;min-width:50px}
+.cmd .k{margin-left:auto;font-size:11px;color:var(--tx-2)}
+.modal-h{padding:var(--sp-4) var(--sp-5);border-bottom:1px solid var(--line);display:flex;
+  align-items:center;justify-content:space-between}
+.modal-h h3{font-size:14px;font-weight:600}
+.modal-b{padding:var(--sp-5);display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-5)}
+.ks{display:flex;flex-direction:column;gap:9px}
+.ks .row{display:flex;align-items:center;justify-content:space-between;font-size:13px;color:var(--tx-1)}
+.ks .sect{margin-bottom:2px}
+
+.pantalla{display:none}
+.pantalla.on{display:block;animation:in .22s var(--e)}
+@keyframes in{from{opacity:0;transform:translateY(6px)}}
+.marcador{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--sp-3);margin-bottom:var(--sp-5)}
+.mcard{background:var(--ink-1);border:1px solid var(--line);border-radius:var(--r-m);padding:var(--sp-4)}
+.mcard .k{font-size:10px;letter-spacing:.11em;text-transform:uppercase;color:var(--tx-2)}
+.mcard .v{font-size:30px;font-weight:600;font-family:'IBM Plex Mono',monospace;letter-spacing:-.03em;margin-top:6px}
+.mcard .d{font-size:11.5px;color:var(--tx-2);margin-top:4px}
+.nota{font-family:'IBM Plex Serif',serif;font-size:13.5px;color:var(--tx-1);line-height:1.65;
+  max-width:66ch;margin-top:var(--sp-4)}
+.nota em{color:var(--brass);font-style:normal;font-weight:600}
+.stag>*{animation:up .34s var(--e) backwards}
+@keyframes up{from{opacity:0;transform:translateY(7px)}}
+
+/* estados de carga / error */
+.cargando,.errorbox{padding:var(--sp-7) var(--sp-5);text-align:center;color:var(--tx-2)}
+.cargando .b{width:120px;height:2px;background:var(--ink-3);border-radius:2px;margin:0 auto var(--sp-4);overflow:hidden}
+.cargando .b i{display:block;height:100%;width:40%;background:var(--brass);border-radius:2px;
+  animation:sl 1.1s var(--e) infinite}
+@keyframes sl{0%{transform:translateX(-100%)}100%{transform:translateX(320%)}}
+.errorbox b{display:block;color:var(--tx-0);font-size:15px;margin-bottom:8px}
+.errorbox p{max-width:46ch;margin:0 auto;font-size:13px;line-height:1.6}
+
+footer.legal{margin-top:var(--sp-7);padding-top:var(--sp-4);border-top:1px solid var(--line);
+  font-size:11px;color:#5A6980;line-height:1.65;max-width:70ch}
+
+@media(max-width:1400px){:root{--read:330px}}
+@media(max-width:1100px){
+  .board{grid-template-columns:1fr}
+  .read{border-left:0;border-top:1px solid var(--line)}
+  .rejilla{grid-template-columns:repeat(2,1fr)}
+  .marcador{grid-template-columns:repeat(2,1fr)}
+}
+@media(max-width:720px){
+  body{overflow:auto}
+  .shell{grid-template-columns:1fr;height:auto}
+  .rail{flex-direction:row;height:56px;border-right:0;border-bottom:1px solid var(--line);
+    padding:0 var(--sp-3);gap:2px;position:sticky;top:0;z-index:50}
+  .logo{margin:0 var(--sp-3) 0 0;width:30px;height:30px}
+  .navbtn[aria-current="true"]::before{left:11px;top:auto;bottom:-2px;width:18px;height:2px}
+  .tip{display:none}
+  .app{height:auto}
+  .cinta{height:auto;flex:none;flex-wrap:wrap;gap:var(--sp-3);padding:var(--sp-3) var(--sp-4)}
+  .cinta .sep,.cinta .right{display:none}
+  .estado .sub{white-space:normal}
+  .rejilla{grid-template-columns:1fr}
+  .anden-b{min-height:0}
+  .marcador{grid-template-columns:1fr 1fr}
+  .center{padding:var(--sp-4) var(--sp-4) var(--sp-6)}
+  .read{padding:var(--sp-4)}
+  .modal-b{grid-template-columns:1fr}
+}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="shell">
+  <nav class="rail" aria-label="Secciones">
+    <div class="logo" title="La Estela">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M2 17c5 0 6-9 11-9s7 5 9 5" stroke="#C8973F" stroke-width="1.6" stroke-linecap="round"/><path d="M2 20c5 0 6-9 11-9s7 5 9 5" stroke="#C8973F" stroke-width="1.2" stroke-linecap="round" opacity=".45"/><path d="M2 23c5 0 6-9 11-9s7 5 9 5" stroke="#C8973F" stroke-width="1" stroke-linecap="round" opacity=".2"/></svg>
+    </div>
+    <button class="navbtn" data-p="radar" aria-current="true">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 3v4M12 17v4M3 12h4M17 12h4"/></svg>
+      <span class="tip">Radar <kbd>1</kbd></span></button>
+    <button class="navbtn" data-p="fichas">
+      <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 4v16"/></svg>
+      <span class="tip">Fichas <kbd>2</kbd></span></button>
+    <button class="navbtn" data-p="marcador">
+      <svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>
+      <span class="tip">Marcador <kbd>3</kbd></span></button>
+    <button class="navbtn" data-p="archivo">
+      <svg viewBox="0 0 24 24"><path d="M3 7h18v13a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7zM3 7l2-4h14l2 4M10 12h4"/></svg>
+      <span class="tip">Archivo <kbd>4</kbd></span></button>
+    <div class="spacer"></div>
+    <button class="navbtn" id="bAtajos">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.2 2.4c-.5.2-.7.6-.7 1.1v.5"/><circle cx="12" cy="17" r=".6" fill="currentColor"/></svg>
+      <span class="tip">Atajos <kbd>?</kbd></span></button>
+  </nav>
+
+  <div class="app">
+    <header class="cinta" id="cinta"></header>
+    <div class="board">
+      <main class="center">
+        <div id="carga" class="cargando"><div class="b"><i></i></div>Leyendo el último cierre…</div>
+
+        <section class="pantalla" id="p-radar">
+          <div class="eyebrow">
+            <h1>Radar de despertares</h1>
+            <span class="q">¿dónde está entrando el dinero ahora?</span>
+            <span class="n" id="nRadar"></span>
+          </div>
+          <div class="rejilla stag" id="rejilla"></div>
+          <div class="bloque" id="bSeg"></div>
+          <footer class="legal" id="legal1"></footer>
+        </section>
+
+        <section class="pantalla" id="p-fichas">
+          <div class="eyebrow"><h1>Fichas abiertas</h1>
+            <span class="q">¿qué está vivo y cómo va?</span><span class="n" id="nFichas"></span></div>
+          <p class="nota">Cada ficha se abre con fecha, huellas y nivel de invalidación declarados <em>antes</em> de saber el resultado. A las cuatro semanas se cierra sola y entra en el marcador, gane o pierda. Ninguna se borra.</p>
+          <div class="bloque" id="bFichas"></div>
+        </section>
+
+        <section class="pantalla" id="p-marcador">
+          <div class="eyebrow"><h1>Marcador</h1>
+            <span class="q">¿esto funciona de verdad?</span><span class="n" id="nMarc"></span></div>
+          <div id="bMarc"></div>
+          <p class="nota">La ventaja de este sistema no es ganar más que el índice: es <em>caer menos</em> cuando el mercado cae. Está dicho aquí, en la primera pantalla, y no en una nota al pie.</p>
+        </section>
+
+        <section class="pantalla" id="p-archivo">
+          <div class="eyebrow"><h1>Archivo</h1>
+            <span class="q">¿cómo salieron las anteriores?</span><span class="n" id="nArch"></span></div>
+          <p class="nota">Todas las fichas ya cerradas, con las que salieron mal incluidas y con el mismo tamaño de letra que las que salieron bien.</p>
+          <div class="bloque" id="bArch"></div>
+        </section>
+      </main>
+      <aside class="read" id="read"></aside>
+    </div>
+  </div>
+</div>
+
+<div class="velo" id="vCmd"><div class="modal" role="dialog" aria-label="Buscar">
+  <input type="text" placeholder="Buscar un sector…" id="cmdInput" autocomplete="off">
+  <div class="cmds" id="cmdList"></div>
+</div></div>
+
+<div class="velo" id="vKeys"><div class="modal" role="dialog" aria-label="Atajos">
+  <div class="modal-h"><h3>Atajos</h3><kbd>Esc</kbd></div>
+  <div class="modal-b">
+    <div class="ks"><div class="sect">Moverse</div>
+      <div class="row"><span>Radar / Fichas / Marcador / Archivo</span><kbd>1 – 4</kbd></div>
+      <div class="row"><span>Sector anterior / siguiente</span><kbd>J / K</kbd></div>
+      <div class="row"><span>Buscar</span><kbd>⌘K</kbd></div></div>
+    <div class="ks"><div class="sect">Hacer</div>
+      <div class="row"><span>Copiar el enlace del sector</span><kbd>C</kbd></div>
+      <div class="row"><span>Ver atajos</span><kbd>?</kbd></div>
+      <div class="row"><span>Cerrar</span><kbd>Esc</kbd></div></div>
+  </div>
+</div></div>
+
+<script>
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const esc=t=>String(t??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const num=(v,d=1,s=false)=>v==null?'—':(s&&v>0?'+':'')+Number(v).toFixed(d).replace('.',',');
+let DATA=null, ITEMS=[], SEL=null;
+
+/* ---- ESTELA: el rastro de fuerza relativa, normalizado a su propio rango ---- */
+function estelaSVG(vals,color,w=56,h=24,sw=1.5){
+  if(!vals||vals.length<3) return `<svg class="estela" viewBox="0 0 ${w} ${h}"></svg>`;
+  const mn=Math.min(...vals), mx=Math.max(...vals), r=(mx-mn)||1, dx=w/(vals.length-1);
+  let p='';
+  vals.forEach((v,i)=>{const x=i*dx, y=h-3-((v-mn)/r)*(h-6); p+=(i?'L':'M')+x.toFixed(1)+' '+y.toFixed(1)+' '});
+  const ly=h-3-((vals[vals.length-1]-mn)/r)*(h-6), id='g'+Math.random().toString(36).slice(2,7);
+  return `<svg class="estela" viewBox="0 0 ${w} ${h}" aria-hidden="true">
+    <defs><linearGradient id="${id}" x1="0" x2="1">
+      <stop offset="0" stop-color="${color}" stop-opacity=".1"/>
+      <stop offset="1" stop-color="${color}" stop-opacity="1"/></linearGradient></defs>
+    <path d="${p}" fill="none" stroke="url(#${id})" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="${w-1.5}" cy="${ly.toFixed(1)}" r="${sw+.4}" fill="${color}"/></svg>`;
+}
+const cmfCls=c=>c==null?'neu':c>0.05?'pos':c<-0.05?'neg':'neu';
+
+/* ---- CINTA ---- */
+function pintaCinta(){
+  const s=DATA.semaforo, d=DATA.dia_ciclo??0, D=['L','M','X','J','V'];
+  const dias=D.map((x,i)=>`<span class="dia ${i<d?'pasado':i===d?'hoy':i===4?'decide':''}">${x}</span>`).join('');
+  const txt=d<4?'Se observa. Se decide el viernes al cierre.':d===4?'Hoy se decide, al cierre.':'Fin de semana: nada que hacer.';
+  const salud=(DATA.salud||[]).length;
+  $('#cinta').innerHTML=`
+    ${s?`<div class="estado"><span class="dot" style="background:${esc(s.color||'#C8973F')};
+        box-shadow:0 0 0 3px ${esc(s.color||'#C8973F')}2E"></span>
+      <b>${esc(s.estado)}</b>
+      <span class="sub">${s.confirmado?'confirmado en dos cierres':'sin confirmar · un cierre es ruido'}</span></div>
+      <div class="sep"></div>`:''}
+    <div class="reloj"><span class="lbl">Ciclo</span><div class="dias">${dias}</div>
+      <span class="txt">${txt}</span></div>
+    <div class="right">
+      <span class="chip ${salud?'clay':'teal'}" title="${salud?'Alguna fuente no respondió en este cierre':'Todas las fuentes respondieron'}">
+        ${salud?salud+' aviso'+(salud>1?'s':'')+' de datos':'datos completos'}</span>
+      <button class="kbtn" id="bCmd">Buscar <kbd>⌘K</kbd></button></div>`;
+  $('#bCmd').onclick=()=>abrir($('#vCmd'));
+}
+
+/* ---- RADAR ---- */
+function pintaRadar(){
+  $('#nRadar').textContent=`${DATA.n_sectores} sectores · cierre ${DATA.cierre}`;
+  $('#rejilla').innerHTML=(DATA.andenes||[]).map((A,i)=>{
+    const cuerpo=A.items.length?A.items.map(it=>{
+      const c=cmfCls(it.cmf);
+      return `<button class="ficha" data-s="${esc(it.sym)}">
+        <span class="tk">${esc(it.sym)}</span>${estelaSVG(it.estela,A.color)}
+        <span class="nm">${esc(it.nombre)}</span>
+        <span class="cmf ${c}">${it.cmf==null?'s/d':num(it.cmf,2,true)}</span></button>`;
+    }).join(''):`<div class="vacio">Ningún sector aquí en este cierre.</div>`;
+    return `<div class="anden${A.id==='despertando'?' foco':''}" style="animation-delay:${i*45}ms">
+      <div class="anden-h"><span class="mark" style="background:${esc(A.color)}"></span>
+        <span class="t" style="color:${esc(A.color)}">${esc(A.titulo)}</span>
+        <span class="c">${A.items.length}</span>
+        <span class="d">${esc(A.desc)}</span></div>
+      <div class="anden-b">${cuerpo}</div></div>`;
+  }).join('');
+  $$('.ficha').forEach(b=>b.onclick=()=>sel(b.dataset.s));
+
+  const seg=ITEMS.filter(i=>i.anden==='despertando'||i.anden==='titular');
+  $('#bSeg').innerHTML=seg.length?`
+    <div class="eyebrow"><h1>Los que ya cruzaron</h1><span class="q">seguimiento, no entrada</span></div>
+    <div class="tw"><table class="tabla"><thead><tr><th>Sector</th><th>Fase</th>
+      <th class="r">Semanas</th><th class="r">Flujo</th><th>Recorrido</th><th class="r">Desde el cruce</th></tr></thead>
+    <tbody>${seg.sort((a,b)=>(b.sem||0)-(a.sem||0)).map(it=>{
+      const A=DATA.andenes.find(x=>x.id===it.anden), pct=Math.min(100,(it.sem||0)*14);
+      return `<tr data-s="${esc(it.sym)}"><td><span class="tk">${esc(it.sym)}</span>
+        <div class="sub">${esc(it.nombre)}</div></td>
+        <td><span class="chip" style="color:${esc(A.color)};border-color:${esc(A.color)}33">${esc(A.titulo)}</span></td>
+        <td class="r mono">${it.sem??'—'}</td>
+        <td class="r mono ${cmfCls(it.cmf)}">${it.cmf==null?'s/d':num(it.cmf,2,true)}</td>
+        <td><span class="barra"><i style="width:${pct}%;background:${esc(A.color)}"></i></span></td>
+        <td class="r mono ${it.pct>0?'pos':it.pct<0?'neg':'neu'}">${it.pct==null?'—':num(it.pct,1,true)+' %'}</td></tr>`;
+    }).join('')}</tbody></table></div>`:'';
+  $$('#bSeg tbody tr').forEach(r=>r.onclick=()=>sel(r.dataset.s));
+
+  $('#legal1').innerHTML=esc(DATA.aviso)+'<br><br>Datos: Yahoo Finance y Stooq. Elaboración propia. '
+    +'Actualizado '+esc(DATA.generado)+'.';
+}
+
+/* ---- FICHAS ---- */
+function pintaFichas(){
+  const F=DATA.fichas||[];
+  $('#nFichas').textContent=`${F.length} abierta${F.length===1?'':'s'}`;
+  $('#bFichas').innerHTML=F.length?`<div class="tw"><table class="tabla">
+    <thead><tr><th>Sector</th><th>Abierta</th><th class="r">Precio entonces</th>
+      <th class="r">Ahora</th><th class="r">vs S&amp;P</th><th class="r">Se invalida en</th><th>Estado</th></tr></thead>
+    <tbody>${F.map(f=>`<tr data-s="${esc(f.sym)}">
+      <td><span class="tk">${esc(f.sym)}</span><div class="sub">${esc(f.nombre)}</div></td>
+      <td class="mono">${esc(f.fecha)}</td>
+      <td class="r mono">${num(f.px0,2)}</td>
+      <td class="r mono ${f.ret>0?'pos':f.ret<0?'neg':'neu'}">${num(f.ret,1,true)} %</td>
+      <td class="r mono ${f.vs>0?'pos':f.vs<0?'neg':'neu'}">${f.vs==null?'—':num(f.vs,1,true)+' %'}</td>
+      <td class="r mono">${num(f.inval,2)}</td>
+      <td>${f.rota?'<span class="chip clay">nivel perdido · se apunta como fallo</span>'
+        :`<span class="chip teal">viva · quedan ${f.faltan} sesiones</span>`}</td></tr>`).join('')}
+    </tbody></table></div>`
+    :`<div class="vacio" style="border:1px solid var(--line);border-radius:var(--r-m);padding:var(--sp-6);text-align:center">
+       Ninguna ficha abierta en este cierre. Ningún sector cumple el patrón completo con el flujo confirmando, y decirlo también forma parte del sistema.</div>`;
+  $$('#bFichas tbody tr').forEach(r=>r.onclick=()=>{ir('radar');sel(r.dataset.s)});
+}
+
+/* ---- MARCADOR ---- */
+function pintaMarcador(){
+  const m=DATA.marcador;
+  if(!m||!m.n){$('#bMarc').innerHTML=`<div class="vacio" style="border:1px solid var(--line);border-radius:var(--r-m);padding:var(--sp-6);text-align:center">
+    Todavía no hay ninguna ficha cerrada. El marcador se llena solo: cada ficha madura a las cuatro semanas.</div>`;
+    $('#nMarc').textContent='sin fichas cerradas';return}
+  $('#nMarc').textContent=`registro en vivo · ${m.n} cerradas`;
+  $('#bMarc').innerHTML=`<div class="marcador stag">
+    <div class="mcard"><div class="k">Fichas cerradas</div><div class="v">${m.aciertos}/${m.n}</div>
+      <div class="d">${m.pct} % de aciertos</div></div>
+    <div class="mcard"><div class="k">Margen de error</div>
+      <div class="v" style="font-size:22px">${m.ic_lo} – ${m.ic_hi} %</div>
+      <div class="d">intervalo de confianza del 95 %</div></div>
+    <div class="mcard"><div class="k">Media a 4 semanas</div>
+      <div class="v ${m.media>0?'pos':'neg'}">${num(m.media,1,true)} %</div>
+      <div class="d">mediana ${num(m.mediana,1,true)} %${m.vs_spy!=null?` · vs S&P ${num(m.vs_spy,1,true)} %`:''}</div></div>
+    <div class="mcard"><div class="k">Invalidadas</div><div class="v neg">${m.invalidadas??0}</div>
+      <div class="d">perdieron su nivel declarado</div></div></div>
+    ${m.maduro?'':'<p class="nota">Muestra todavía pequeña: menos de 20 fichas cerradas. Léelo con pinzas.</p>'}`;
+}
+
+/* ---- ARCHIVO ---- */
+function pintaArchivo(){
+  const A=DATA.archivo||[];
+  $('#nArch').textContent=`${A.length} cerradas`;
+  $('#bArch').innerHTML=A.length?`<div class="tw"><table class="tabla">
+    <thead><tr><th>Sector</th><th>Abierta</th><th>Fase al abrir</th>
+      <th class="r">Resultado</th><th class="r">vs S&amp;P</th><th>Cierre</th></tr></thead>
+    <tbody>${A.map(c=>`<tr>
+      <td><span class="tk">${esc(c.sym)}</span><div class="sub">${esc(c.nombre)}</div></td>
+      <td class="mono">${esc(c.fecha)}</td><td class="sub">${esc(c.fase||'')}</td>
+      <td class="r mono ${c.ret>0?'pos':'neg'}">${num(c.ret,1,true)} %</td>
+      <td class="r mono ${c.vs>0?'pos':c.vs<0?'neg':'neu'}">${c.vs==null?'—':num(c.vs,1,true)+' %'}</td>
+      <td>${c.rota?'<span class="chip clay">nivel perdido</span>'
+        :c.gana?'<span class="chip teal">acertada</span>':'<span class="chip">fallada</span>'}</td></tr>`).join('')}
+    </tbody></table></div>`
+    :`<div class="vacio" style="border:1px solid var(--line);border-radius:var(--r-m);padding:var(--sp-6);text-align:center">
+       El archivo se llena solo a medida que las fichas maduran.</div>`;
+}
+
+/* ---- PANEL DE LECTURA ---- */
+function sel(s){
+  const it=ITEMS.find(x=>x.sym===s); if(!it)return; SEL=s;
+  $$('.ficha').forEach(f=>f.setAttribute('aria-selected',f.dataset.s===s));
+  const A=DATA.andenes.find(x=>x.id===it.anden);
+  const fi=(DATA.fichas||[]).find(f=>f.sym===s);
+  $('#read').innerHTML=`
+    <div class="read-h"><div><div class="tk">${esc(it.sym)}</div>
+      <div class="nm">${esc(it.nombre)}</div></div>
+      <span class="chip" style="color:${esc(A.color)};border-color:${esc(A.color)}33">${esc(A.titulo)}</span></div>
+    <div class="sect">Lo que ve el tablero</div>
+    <p class="lectura">${esc(it.lectura)}</p>
+    <div class="kv">
+      <div><div class="k">Flujo (CMF)</div><div class="v ${cmfCls(it.cmf)}">${it.cmf==null?'s/d':num(it.cmf,2,true)}</div></div>
+      <div><div class="k">${it.anden==='dormido'||it.anden==='removiendo'?'Semanas rezagado':'Semanas desde el cruce'}</div>
+        <div class="v">${it.sem??'—'}</div></div></div>
+    ${it.huellas&&it.huellas.length?`<div class="sect">Huellas</div>
+      <div class="huellas">${it.huellas.map(h=>`<span class="chip">${esc(h)}</span>`).join('')}</div>`:''}
+    <div class="sect">Fuerza relativa al S&amp;P · 8 semanas</div>
+    <div class="estelaGr">${estelaSVG(it.estela,A.color,300,90,2)}</div>
+    ${fi?`<div class="inval"><b>Se invalida si pierde ${num(fi.inval,2)}</b>
+      Nivel declarado el ${esc(fi.fecha)}, antes de conocer el resultado.
+      ${fi.rota?'Ya lo ha perdido: entra en el marcador como fallo.'
+        :`Lleva ${fi.sesiones} sesiones; se cierra solo en ${fi.faltan} más, gane o pierda.`}</div>`:''}
+    <div style="display:flex;gap:8px;margin-top:auto;padding-top:8px">
+      <button class="btn pri" style="flex:1" onclick="copiar()">Copiar enlace</button>
+      ${DATA.links&&DATA.links.telegram?`<a class="btn gh" href="${esc(DATA.links.telegram)}">Seguir</a>`:''}
+    </div>`;
+  history.replaceState(null,'','#'+s);
+}
+function copiar(){
+  navigator.clipboard?.writeText(location.href);
+  const b=$('.read .btn.pri'); if(b){const t=b.textContent;b.textContent='Copiado';setTimeout(()=>b.textContent=t,1400)}
+}
+
+/* ---- NAVEGACIÓN ---- */
+const P=['radar','fichas','marcador','archivo'];
+function ir(p){
+  $$('.navbtn[data-p]').forEach(b=>b.setAttribute('aria-current',String(b.dataset.p===p)));
+  $$('.pantalla').forEach(s=>s.classList.toggle('on',s.id==='p-'+p));
+}
+$$('.navbtn[data-p]').forEach(b=>b.onclick=()=>ir(b.dataset.p));
+const abrir=v=>{v.classList.add('on');const i=v.querySelector('input');if(i){i.value='';listaCmd('');i.focus()}};
+const cerrar=()=>$$('.velo').forEach(v=>v.classList.remove('on'));
+$('#bAtajos').onclick=()=>abrir($('#vKeys'));
+$$('.velo').forEach(v=>v.onclick=e=>{if(e.target===v)cerrar()});
+function listaCmd(q){
+  const r=ITEMS.filter(i=>(i.sym+' '+i.nombre).toLowerCase().includes(q.toLowerCase())).slice(0,8);
+  $('#cmdList').innerHTML=r.length?r.map((i,n)=>`<div class="cmd${n?'':' sel'}" data-s="${esc(i.sym)}">
+    <span class="tkk">${esc(i.sym)}</span> ${esc(i.nombre)} <span class="k">${esc(i.anden)}</span></div>`).join('')
+    :`<div class="cmd" style="color:var(--tx-2)">Ningún sector con ese nombre.</div>`;
+  $$('#cmdList .cmd[data-s]').forEach(c=>c.onclick=()=>{cerrar();ir('radar');sel(c.dataset.s)});
+}
+$('#cmdInput').oninput=e=>listaCmd(e.target.value);
+$('#cmdInput').onkeydown=e=>{if(e.key==='Enter'){const f=$('#cmdList .cmd[data-s]');if(f){cerrar();ir('radar');sel(f.dataset.s)}}};
+addEventListener('keydown',e=>{
+  if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();abrir($('#vCmd'));return}
+  if(e.key==='Escape'){cerrar();return}
+  if(e.target.tagName==='INPUT')return;
+  if(e.key==='?'){abrir($('#vKeys'));return}
+  if(P[+e.key-1]){ir(P[+e.key-1]);return}
+  if(e.key.toLowerCase()==='c'&&SEL){copiar();return}
+  if('jk'.includes(e.key.toLowerCase())&&ITEMS.length){
+    const c=ITEMS.findIndex(i=>i.sym===SEL);
+    const n=ITEMS[e.key.toLowerCase()==='j'?Math.min(ITEMS.length-1,c+1):Math.max(0,c-1)];
+    if(n)sel(n.sym);
+  }
+});
+
+/* ---- ARRANQUE ---- */
+fetch('datos.json?v='+Date.now())
+  .then(r=>{if(!r.ok)throw new Error(r.status);return r.json()})
+  .then(d=>{
+    DATA=d; ITEMS=(d.andenes||[]).flatMap(a=>a.items);
+    $('#carga').remove();
+    pintaCinta();pintaRadar();pintaFichas();pintaMarcador();pintaArchivo();
+    ir('radar');
+    const h=location.hash.slice(1);
+    sel(ITEMS.find(i=>i.sym===h)?h:(ITEMS[0]||{}).sym);
+    document.title=`La Estela — ${d.semaforo?d.semaforo.estado:'radar'} · ${d.cierre}`;
+  })
+  .catch(err=>{
+    $('#carga').outerHTML=`<div class="errorbox"><b>No se ha podido leer el último cierre</b>
+      <p>El archivo de datos no responde. Suele resolverse solo en el siguiente build; si sigue igual mañana, es que el build ha fallado.</p>
+      <p style="margin-top:14px"><button class="btn" onclick="location.reload()">Reintentar</button></p></div>`;
+    $('#cinta').innerHTML=`<div class="estado"><span class="dot" style="background:#B85A55"></span>
+      <b>Sin datos</b><span class="sub">${esc(err.message)}</span></div>`;
+  });
+</script>
+</body>
+</html>

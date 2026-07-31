@@ -7045,6 +7045,8 @@ def build_html(df, rrg, alerts, breadth, risk, regime, buy, avoid, sources, fred
             def _mcelda(cj):
                 v = momento["cajas"].get(cj, [])
                 col = _MC[cj]
+                # fuera de la f-string a proposito: un backslash dentro de {..} rompe en Python 3.11
+                _vacio = "<span style='font-size:11px;color:var(--txt3)'>vacio</span>"
                 chips = ""
                 for r in v[:9]:
                     _h = " <span title='corre y no sale en ningun otro panel'>&#9679;</span>" if r["huerfano"] else ""
@@ -7058,7 +7060,7 @@ def build_html(df, rrg, alerts, breadth, risk, regime, buy, avoid, sources, fred
                         f"<div style='font-size:12px;font-weight:700;color:{col}'>{cj} "
                         f"<span style='color:var(--txt3);font-weight:400'>({len(v)})</span></div>"
                         f"<div style='font-size:10px;color:var(--txt3);margin-bottom:5px'>{_MD[cj]}</div>"
-                        f"{chips or '<span style=\'font-size:11px;color:var(--txt3)\'>vacio</span>'}</div>")
+                        f"{chips or _vacio}</div>")
             _grid = ("<div style='display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0'>"
                      + _mcelda("EN MARCHA") + _mcelda("MADURO")
                      + _mcelda("GIRANDO") + _mcelda("CAYENDO") + "</div>")

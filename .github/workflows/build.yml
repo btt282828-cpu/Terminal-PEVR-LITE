@@ -1,0 +1,73 @@
+name: Terminal PeVR
+
+# Cuando se ejecuta:
+#   - a mano, desde la pestana Actions (boton "Run workflow")
+#   - automatico los viernes a las 22:00 UTC (cierre de Nueva York + margen para que
+#     Yahoo consolide los datos del dia). El cierre del viernes es el unico disparador
+#     del sistema, asi que el resto de la semana no hace falta.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 22 * * 5"
+
+# Permisos: escribir en el repo (para guardar el historico actualizado) y publicar en Pages.
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+# Si se lanzan dos a la vez, que no se pisen.
+concurrency:
+  group: terminal
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el repositorio
+        uses: actions/checkout@v4
+
+      - name: Preparar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Ejecutar el terminal
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+        run: python rotacion.py
+
+      - name: Guardar el historico actualizado
+        # El programa reescribe historico_seguimiento_NO_BORRAR en cada ejecucion
+        # (fichas, marcador, libro). Sin este paso se perderia al terminar la maquina.
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add historico_seguimiento_NO_BORRAR || true
+          if git diff --staged --quiet; then
+            echo "Sin cambios en el historico."
+          else
+            git commit -m "historico $(date -u +%Y-%m-%d)"
+            git pull --rebase --autostash || true
+            git push
+          fi
+
+      - name: Preparar la publicacion
+        uses: actions/configure-pages@v5
+
+      - name: Empaquetar la web
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  publicar:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - name: Publicar en GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4

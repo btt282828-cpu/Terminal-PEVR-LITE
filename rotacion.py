@@ -85,6 +85,39 @@ def _avisar(origen, msg, nivel="warning"):
     except Exception:
         pass                                              # el sistema de avisos jamas puede tumbar el build
 
+
+# ======================================================================
+# DEGRADACIONES SILENCIOSAS  (v4 — entrega 1)
+# _avisar() cuenta lo que YA se detectaba. _deg() cuenta lo que hasta ahora
+# se tragaba un "except: pass" dentro de funciones de CALCULO. No imprime
+# nada por consola (evita el ruido de 170 avisos): solo agrega por origen y
+# se muestra RESUMIDO en el panel SALUD DEL BUILD. Sirve para responder a
+# "por que este numero salio raro un viernes".
+# ======================================================================
+_DEG = {}                 # {origen: [veces, ultimo_error]}
+_DEG_MAX = 200
+
+def _deg(origen, err=""):
+    """Anota una degradacion silenciosa. Nunca lanza. Nunca imprime."""
+    try:
+        o = str(origen)[:60]
+        e = (type(err).__name__ + ": " + str(err)) if isinstance(err, BaseException) else str(err)
+        if o in _DEG:
+            _DEG[o][0] += 1
+            _DEG[o][1] = e[:110]
+        elif len(_DEG) < _DEG_MAX:
+            _DEG[o] = [1, e[:110]]
+    except Exception:
+        pass
+
+def _deg_resumen(top=25):
+    """Lista [(origen, veces, ultimo_error)] ordenada por frecuencia."""
+    try:
+        return sorted(([o, v[0], v[1]] for o, v in _DEG.items()),
+                      key=lambda x: -x[1])[:top]
+    except Exception:
+        return []
+
 # ----------------------------------------------------------------------
 # CONFIG  (lo unico que quizas quieras tocar)
 # ----------------------------------------------------------------------
@@ -682,7 +715,10 @@ TOP_HOLDING = {
 }
 SITE_DIR = "site"                                # carpeta que publica GitHub Pages
 STATIC_DIR = "static"                            # iconos, manifest, service worker
-OUTPUT_HTML = os.path.join(SITE_DIR, "index.html")
+# El terminal completo vive en /pro/ para dejar la raiz a la web publica (La Estela),
+# que es el enlace que se reparte. Ojo: una ruta poco adivinable NO es seguridad —
+# si el workflow publica site/ entero, /pro/ es accesible para quien lo pruebe.
+OUTPUT_HTML = os.path.join(SITE_DIR, "pro", "index.html")
 CACHE_DIR = "cache_rotacion"
 # ----------------------------------------------------------------------
 
@@ -830,7 +866,8 @@ def fetch_stooq(sym, start, end):
         cols = [c for c in ["Open", "High", "Low", "Close", "Volume"] if c in df.columns]
         out = df[cols].copy()
         return out[out.index >= pd.Timestamp(start)]
-    except Exception:
+    except Exception as _dege:
+        _deg("fetch_stooq:836", _dege)
         return None
 
 def fetch_yahoo(sym, start, end):
@@ -866,7 +903,8 @@ def load_cache(sym):
     if os.path.exists(p):
         try:
             return pd.read_csv(p, index_col=0, parse_dates=True).sort_index()
-        except Exception:
+        except Exception as _dege:
+            _deg("load_cache:872", _dege)
             return None
     return None
 
@@ -876,6 +914,40 @@ SEGUIMIENTO_DIR = "historico_seguimiento_NO_BORRAR"
 TRACK_FILE = os.path.join(SEGUIMIENTO_DIR, "track_record.json")
 TRACK_BAK = os.path.join(SEGUIMIENTO_DIR, "track_record.bak.json")
 _OLD_TRACK = os.path.join(CACHE_DIR, "track_record.json")          # ubicacion antigua (dentro de la cache)
+
+# ======================================================================
+# CONFIG EXTERNA  (v4 — entrega 2)
+# Si existe config.py con lineas descomentadas, SUS valores mandan sobre los
+# de arriba. Si no existe, o esta todo comentado, no cambia absolutamente nada.
+# El terminal NUNCA se cae por culpa de config.py.
+# ======================================================================
+_CFG_APLICADOS = []
+try:
+    import config as _cfg
+    for _k in dir(_cfg):
+        if _k.startswith("_"):
+            continue
+        if _k in globals():
+            _nuevo, _viejo = getattr(_cfg, _k), globals()[_k]
+            if _nuevo != _viejo:
+                globals()[_k] = _nuevo
+                _CFG_APLICADOS.append(f"{_k}: {_viejo!r} -> {_nuevo!r}"[:90])
+    # constantes DERIVADAS: hay que recalcularlas si su origen ha cambiado
+    GRUPO_SECTORES = SECTORS + ["IWM", "DIA", "RSP"]
+    for _s in GRUPO_SECTORES:
+        GRUPO[_s] = "sector"
+    OUTPUT_HTML = os.path.join(SITE_DIR, "pro", "index.html")
+    TRACK_FILE = os.path.join(SEGUIMIENTO_DIR, "track_record.json")
+    TRACK_BAK = os.path.join(SEGUIMIENTO_DIR, "track_record.bak.json")
+    _OLD_TRACK = os.path.join(CACHE_DIR, "track_record.json")
+    if _CFG_APLICADOS:
+        print(f"  ⚙ config.py: {len(_CFG_APLICADOS)} parametro(s) sustituido(s)")
+        for _c in _CFG_APLICADOS:
+            print(f"     · {_c}")
+except ImportError:
+    pass                                   # sin config.py: comportamiento original intacto
+except Exception as _e:
+    _avisar("config", f"config.py existe pero fallo al leerlo ({_e}); se usan los valores de rotacion.py")
 try:
     # migracion: si tienes histórico en la cache vieja y aun no en la nueva, lo traslado para no perderlo
     if os.path.exists(_OLD_TRACK) and not os.path.exists(TRACK_FILE):
@@ -912,12 +984,14 @@ def update_track_record(basket, px_now, datestr, marked=None):
         try:
             with open(TRACK_FILE, "r", encoding="utf-8") as fh:
                 recs = json.load(fh)
-        except Exception:
+        except Exception as _dege:
+            _deg("update_track_record:918", _dege)
             # si el principal está corrupto, intento recuperar desde la copia de seguridad
             try:
                 with open(TRACK_BAK, "r", encoding="utf-8") as fh:
                     recs = json.load(fh)
-            except Exception:
+            except Exception as _dege:
+                _deg("update_track_record:923", _dege)
                 recs = []
     wk = semana_trading(datestr)
     px_clean = {k: float(v) for k, v in px_now.items() if v is not None and v == v}
@@ -1114,7 +1188,8 @@ def get_ohlcv(sym, start, end):
     if c is not None:
         try:
             edad = max(0, len(pd.bdate_range(c.index[-1].date(), dt.date.today())) - 1)
-        except Exception:
+        except Exception as _dege:
+            _deg("get_ohlcv:1120", _dege)
             edad = 0
         if edad > 5:
             _avisar(f"datos.{sym}", f"sin fuente viva y cache de hace {edad} sesiones: simbolo EXCLUIDO del build")
@@ -1293,7 +1368,8 @@ def add_sinteticos(df):
                 continue
             comp = (sub / sub.iloc[0]).mean(axis=1) * 100.0
             df[key] = comp.reindex(df.index)
-        except Exception:
+        except Exception as _dege:
+            _deg("add_sinteticos:1299", _dege)
             continue
     return df
 
@@ -1463,7 +1539,8 @@ def compute_volume_flow(daily, only=None):
                     _vprev = vol.iloc[-(_k + 20):-_k]
                     if len(_vprev) >= 10 and float(_vprev.mean()) > 0:
                         _vk = round(float(vol.iloc[-_k]) / float(_vprev.mean()), 2)
-                except Exception:
+                except Exception as _dege:
+                    _deg("compute_volume_flow:1469", _dege)
                     _vk = None
                 clima = "climax" if _z > 0 else "capitulacion"
                 zday, ret1d = round(_z, 1), round(_rk * 100, 1)
@@ -1483,7 +1560,8 @@ def compute_volume_flow(daily, only=None):
                     ses20 = round(float(_ses.dropna().sum()) * 100, 1)
                     if sym in FLUJO_NOCTURNO_SYMS and noct20 >= FLUJO_NOCTURNO_MIN and cmf is not None and cmf <= 0:
                         acum_ext = True
-        except Exception:
+        except Exception as _dege:
+            _deg("compute_volume_flow:1489", _dege)
             pass
         # --- CMF MEJORANDO (flujo por tramos): CMF muestreado hoy / -1s / -2s / -3s. Tres subidas seguidas =
         #     "dejó de empeorar y gira" — aún no es CMF>0 (posición completa) pero ya justifica MANGA PEQUEÑA. ---
@@ -1495,7 +1573,8 @@ def compute_volume_flow(daily, only=None):
                     _s0, _s1, _s2, _s3 = (float(_cser.iloc[-1]), float(_cser.iloc[-6]),
                                           float(_cser.iloc[-11]), float(_cser.iloc[-16]))
                     cmf_mejora = bool(_s0 > _s1 > _s2 > _s3)
-        except Exception:
+        except Exception as _dege:
+            _deg("compute_volume_flow:1501", _dege)
             pass
         diverg = None
         if cmf is not None and price_t > 0.5 and flow < -0.5 and cmf < -0.05:
@@ -1903,11 +1982,13 @@ def update_wire_ledger(items, close_date):
         try:
             with open(WIRE_FILE, "r", encoding="utf-8") as fh:
                 recs = json.load(fh)
-        except Exception:
+        except Exception as _dege:
+            _deg("update_wire_ledger:1909", _dege)
             try:
                 with open(WIRE_BAK, "r", encoding="utf-8") as fh:
                     recs = json.load(fh)
-            except Exception:
+            except Exception as _dege:
+                _deg("update_wire_ledger:1913", _dege)
                 recs = []
     d = str(close_date)
     recs = [r for r in recs if r.get("date") != d]
@@ -2019,11 +2100,13 @@ def update_contrarian_ledger(sigs, px_now, datestr, df):
         try:
             with open(CONTRA_FILE, "r", encoding="utf-8") as fh:
                 recs = json.load(fh)
-        except Exception:
+        except Exception as _dege:
+            _deg("update_contrarian_ledger:2025", _dege)
             try:
                 with open(CONTRA_BAK, "r", encoding="utf-8") as fh:
                     recs = json.load(fh)
-            except Exception:
+            except Exception as _dege:
+                _deg("update_contrarian_ledger:2029", _dege)
                 recs = []
     try:
         wk = pd.Timestamp(datestr).strftime("%G-W%V")
@@ -2126,7 +2209,8 @@ def _px_en_fecha(serie, fecha):
         if idx >= len(s):
             idx = len(s) - 1
         return float(s.iloc[idx])
-    except Exception:
+    except Exception as _dege:
+        _deg("_px_en_fecha:2132", _dege)
         return None
 
 # --- PROXY DE OPCIONES para ETFs con opciones ILIQUIDAS: se leen las 2-3 acciones mas grandes
@@ -2174,7 +2258,8 @@ def compute_cobertura(options, rrg=None, flow=None, min_hist=8):
     try:
         _f = os.path.join(SEGUIMIENTO_DIR, "options_iv.json")
         hist = json.load(open(_f, encoding="utf-8")) if os.path.exists(_f) else {}
-    except Exception:
+    except Exception as _dege:
+        _deg("compute_cobertura:2180", _dege)
         hist = {}
 
     hoy = str(dt.date.today())
@@ -2289,7 +2374,8 @@ def compute_options(symbols, flow=None, daily=None, max_syms=40):
             vol_parcial = True
             _avisar("options", f"build a las {_ny:%H:%M} NY (sesion USA no cerrada): volumen de opciones PARCIAL — "
                                "el PCR-vol de hoy es provisional; fiate mas del PCR-OI (T-1). El build 'bueno' es el del cierre")
-    except Exception:
+    except Exception as _dege:
+        _deg("compute_options:2295", _dege)
         pass
 
     def _analiza(tkr, spot_hint=None):
@@ -2309,7 +2395,8 @@ def compute_options(symbols, flow=None, daily=None, max_syms=40):
                     try:
                         c = tk.option_chain(e)
                         _chains[e] = c if (c.calls is not None and len(c.calls) and c.puts is not None and len(c.puts)) else None
-                    except Exception:
+                    except Exception as _dege:
+                        _deg("compute_options:2315", _dege)
                         _chains[e] = None
                 return _chains[e]
             # MEJORA 1: PCR / OI / liquidez agregados sobre los 3 vencimientos mas cercanos (>=5d), no
@@ -2369,7 +2456,8 @@ def compute_options(symbols, flow=None, daily=None, max_syms=40):
                 try:
                     _fp = float(tk.fast_info["lastPrice"])
                     spot = _fp if _fp > 0 else None
-                except Exception:
+                except Exception as _dege:
+                    _deg("compute_options:2375", _dege)
                     spot = None
             if spot is None or spot <= 0:
                 _avisar(f"options.{tkr}", "sin spot fiable (ni cierre diario ni fast_info): cadena NO analizada para no inventar el ATM")
@@ -2399,7 +2487,8 @@ def compute_options(symbols, flow=None, daily=None, max_syms=40):
                 try:
                     if {"bid", "ask"}.issubset(d.columns):
                         e1 = d[(d["bid"].fillna(0) > 0) & (d["ask"].fillna(0) > 0)]
-                except Exception:
+                except Exception as _dege:
+                    _deg("compute_options:2405", _dege)
                     e1 = d.iloc[0:0]
                 if len(e1):
                     return e1
@@ -2407,7 +2496,8 @@ def compute_options(symbols, flow=None, daily=None, max_syms=40):
                     if "lastTradeDate" in d.columns:
                         _lt = pd.to_datetime(d["lastTradeDate"], utc=True, errors="coerce")
                         d = d[_lt >= (pd.Timestamp.now(tz="UTC") - pd.Timedelta(days=5))]
-                except Exception:
+                except Exception as _dege:
+                    _deg("compute_options:2413", _dege)
                     pass
                 return d
             cq, pq = _calidad(calls_iv), _calidad(puts_iv)
@@ -2428,7 +2518,8 @@ def compute_options(symbols, flow=None, daily=None, max_syms=40):
                         skew = float(p_otm["impliedVolatility"].iloc[0] - c_otm["impliedVolatility"].iloc[0])
                         if abs(skew) > 0.18:      # >18 ptos de vol entre put y call 5% OTM = cadena rota, no señal
                             skew = None
-            except Exception:
+            except Exception as _dege:
+                _deg("compute_options:2434", _dege)
                 pass
             if iliq:
                 skew = None
@@ -2444,7 +2535,8 @@ def compute_options(symbols, flow=None, daily=None, max_syms=40):
                     if bestval is None or dolor < bestval:
                         best, bestval = K, dolor
                 maxpain = best
-            except Exception:
+            except Exception as _dege:
+                _deg("compute_options:2450", _dege)
                 pass
             mp_dist = None
             if maxpain and spot:
@@ -2466,7 +2558,8 @@ def compute_options(symbols, flow=None, daily=None, max_syms=40):
         try:
             if daily and s in daily and daily[s] is not None:
                 spot = float(daily[s]["Close"].dropna().iloc[-1])
-        except Exception:
+        except Exception as _dege:
+            _deg("compute_options:2472", _dege)
             pass
         m = _analiza(s, spot_hint=spot)
         if m is None:
@@ -2510,7 +2603,8 @@ def compute_options(symbols, flow=None, daily=None, max_syms=40):
                         _rvs = (_rc.rolling(21).std() * (252 ** 0.5)).dropna()
                         if len(_rvs):
                             _rvnow = float(_rvs.iloc[-1])
-            except Exception:
+            except Exception as _dege:
+                _deg("compute_options:2516", _dege)
                 _rvnow = None
             if _rvnow and _rvnow > 0 and not (0.35 <= _ivv / _rvnow <= 4.0):
                 _mal = True
@@ -2527,7 +2621,8 @@ def compute_options(symbols, flow=None, daily=None, max_syms=40):
                     rv = (rc.rolling(21).std() * (252 ** 0.5)).dropna()
                     if len(rv) > 60:
                         iv_pct = int(round(100 * float((rv < m["iv"]).mean())))
-        except Exception:
+        except Exception as _dege:
+            _deg("compute_options:2533", _dege)
             pass
         cmf = (flow.get(s, {}) or {}).get("cmf")
         diverg = None
@@ -2559,7 +2654,8 @@ def compute_options(symbols, flow=None, daily=None, max_syms=40):
         if os.path.exists(_ivf):
             try:
                 _hist = json.load(open(_ivf, encoding="utf-8"))
-            except Exception:
+            except Exception as _dege:
+                _deg("compute_options:2565", _dege)
                 _hist = {}
         _hoyk = str(dt.date.today())
         def _iv_de(v):
@@ -2591,7 +2687,8 @@ def compute_options(symbols, flow=None, daily=None, max_syms=40):
             _tmp = _ivf + ".tmp"
             json.dump(_hist, open(_tmp, "w", encoding="utf-8"))
             os.replace(_tmp, _ivf)
-        except Exception:
+        except Exception as _dege:
+            _deg("compute_options:2597", _dege)
             pass
     except Exception as _e_iv:
         _avisar("options.iv_rank", f"historial de IV no persistido (el IV pct usara la aproximacion): {_e_iv}")
@@ -2892,7 +2989,8 @@ def compute_fichas(df, daily, rrg, flow, scores, suelo, centinela, plan, chosen,
             try:
                 dd_ = daily.get(s)
                 vols[s] = float(dd_["Close"].pct_change().iloc[-63:].std()) if dd_ is not None else None
-            except Exception:
+            except Exception as _dege:
+                _deg("compute_fichas:2898", _dege)
                 vols[s] = None
         vlist = sorted(v for v in vols.values() if v is not None)
         def _volpct(s):
@@ -2925,7 +3023,8 @@ def compute_fichas(df, daily, rrg, flow, scores, suelo, centinela, plan, chosen,
                     rsp = (df[s] / df[padre]).dropna()
                     ch = float(rsp.iloc[-1] / rsp.iloc[-min(13, len(rsp) - 1) - 1] - 1) * 100
                     c_ind = max(5, min(95, 50 + ch * 3))
-                except Exception:
+                except Exception as _dege:
+                    _deg("compute_fichas:2931", _dege)
                     pass
             # flujo institucional
             if cmf is None:
@@ -2943,7 +3042,8 @@ def compute_fichas(df, daily, rrg, flow, scores, suelo, centinela, plan, chosen,
             try:
                 dcl = daily.get(s)["Close"].dropna()
                 hi52 = float(dcl.iloc[-1] / dcl.iloc[-252:].max() * 100)
-            except Exception:
+            except Exception as _dege:
+                _deg("compute_fichas:2949", _dege)
                 pass
             if hi52 is not None:
                 if hi52 >= 97: c_rie -= 12                       # extendida en maximos
@@ -2962,7 +3062,8 @@ def compute_fichas(df, daily, rrg, flow, scores, suelo, centinela, plan, chosen,
                             cmax, cwho = abs(cv), o
                     c_cor = 88 if cmax < .5 else 60 if cmax < .8 else 28
                     cor_lbl = f"max {cmax:.2f} con {cwho}" if cwho else "libre"
-            except Exception:
+            except Exception as _dege:
+                _deg("compute_fichas:2968", _dege)
                 pass
             # divergencia de OPCIONES (antes del score): flujo entra pero compran proteccion = 2a via de distribucion
             _opt = (options or {}).get(s) if options else None
@@ -3002,7 +3103,8 @@ def compute_fichas(df, daily, rrg, flow, scores, suelo, centinela, plan, chosen,
                     if "UUP" in df.columns:
                         _uu = df["UUP"].dropna()
                         dolar_fuerte = float(_uu.iloc[-1] / _uu.iloc[-min(5, len(_uu) - 1) - 1] - 1) > 0.01
-                except Exception:
+                except Exception as _dege:
+                    _deg("compute_fichas:3008", _dege)
                     pass
                 if crudo_fuerte or dolar_fuerte:
                     _mot = " + ".join([m for m, ok in [("crudo subiendo (coste de combustible)", crudo_fuerte),
@@ -3026,7 +3128,8 @@ def compute_fichas(df, daily, rrg, flow, scores, suelo, centinela, plan, chosen,
                     rad = 1.96 * math.sqrt(max(p * (1 - p), 1e-9) / n + 1.96 ** 2 / (4 * n * n)) / den
                     prob = {"p": int(round(p * 100)), "lo": int(round((ctr - rad) * 100)),
                             "hi": int(round((ctr + rad) * 100)), "n": n}
-            except Exception:
+            except Exception as _dege:
+                _deg("compute_fichas:3032", _dege)
                 pass
             # direccion
             en_cart = s in cartera_set
@@ -3115,7 +3218,8 @@ def compute_fichas(df, daily, rrg, flow, scores, suelo, centinela, plan, chosen,
                         cv = rets_w[a].corr(rets_w[b])
                         if cv == cv and cv > .92:
                             grupo_de[a] = a; grupo_de[b] = a
-        except Exception:
+        except Exception as _dege:
+            _deg("compute_fichas:3121", _dege)
             pass
         raiz = {}
         for ff in fichas:
@@ -3410,7 +3514,8 @@ def fetch_dix():
         return {"last": round(last, 1), "m5": round(m5, 1), "pct": pct, "gex": gex,
                 "senal": senal, "scol": scol, "fecha": str(d["_fecha"].iloc[-1].date()),
                 "spark": [float(x) for x in dix.iloc[-40:]]}
-    except Exception:
+    except Exception as _dege:
+        _deg("fetch_dix:3416", _dege)
         return None
 
 
@@ -3432,7 +3537,8 @@ def fetch_fear_greed():
         return {"score": round(float(sc)), "rating": (fg.get("rating") or "").strip(),
                 "prev": _g("previous_close"), "week": _g("previous_1_week"),
                 "month": _g("previous_1_month"), "year": _g("previous_1_year")}
-    except Exception:
+    except Exception as _dege:
+        _deg("fetch_fear_greed:3438", _dege)
         return None
 
 def cash_plan(close, hl=None):
@@ -3540,7 +3646,8 @@ def fetch_es_futuro():
         except Exception:
             ts = str(ts)[:16]
         return {"last": round(float(c.iloc[-1]), 2), "ts": ts}
-    except Exception:
+    except Exception as _dege:
+        _deg("fetch_es_futuro:3546", _dege)
         return None
 
 # ----------------------------------------------------------------------
@@ -3794,7 +3901,8 @@ def _yf_batch_closes(tickers):
                 s = cl[t].dropna()
                 if len(s) > 200:
                     closes[str(t)] = s
-        except Exception:
+        except Exception as _dege:
+            _deg("_yf_batch_closes:3800", _dege)
             continue
         time.sleep(0.4)
     return closes
@@ -3825,7 +3933,8 @@ def _phase(s, drs):
     baja = bajando · lateral = medio sin sesgo. Usa media 30 semanas + posicion en rango 52s + aceleracion RS."""
     try:
         s = s.dropna()
-    except Exception:
+    except Exception as _dege:
+        _deg("_phase:3831", _dege)
         return None
     if s is None or len(s) < 170:
         return None
@@ -4338,7 +4447,8 @@ def ai_commentary(summary):
         j = r.json()
         txt = "".join(b.get("text", "") for b in j.get("content", []) if b.get("type") == "text")
         return txt.strip() or None
-    except Exception:
+    except Exception as _dege:
+        _deg("ai_commentary:4344", _dege)
         return None
 
 # ----------------------------------------------------------------------
@@ -5407,7 +5517,8 @@ def update_centinela_ledger(estado, close_date):
         if os.path.exists(CENTINELA_FILE):
             with open(CENTINELA_FILE, "r", encoding="utf-8") as fh:
                 recs = json.load(fh)
-    except Exception:
+    except Exception as _dege:
+        _deg("update_centinela_ledger:5413", _dege)
         recs = []
     d = str(close_date)
     recs = [r for r in recs if r.get("date") != d]
@@ -5860,7 +5971,8 @@ def compute_cockpit_beta(df, rrg, flow, suelo=None, graduados=None, desks=None, 
                          "desk_prob": desk_prob, "desk_id": (dk or {}).get("id"),
                          "gr_sem": (gr or {}).get("sem"), "acc": acc, "acol": acol,
                          "orden": FASE_ORDEN.get(fase, 9)})
-        except Exception:
+        except Exception as _dege:
+            _deg("compute_cockpit_beta:5866", _dege)
             continue
     rows.sort(key=lambda r: (r["orden"], -r["sc"]))
     return rows or None
@@ -5998,7 +6110,8 @@ def compute_rebote_desk(df, daily, rrg, flow, scores, leaders, giro=None, prefs=
             wl = dser["Close"].dropna().resample("W-FRI").last().dropna()
             if len(wl) > len(w):
                 w = wl
-    except Exception:
+    except Exception as _dege:
+        _deg("compute_rebote_desk:6004", _dege)
         pass
     if len(w) < 30:
         return None
@@ -7428,7 +7541,8 @@ def build_html(df, rrg, alerts, breadth, risk, regime, buy, avoid, sources, fred
     # historico para "% desde que entro" (racha continua; reinicia si sale y vuelve) — disponible para scoring Y cartera
     try:
         _recs_e = json.load(open(TRACK_FILE, encoding="utf-8")) if os.path.exists(TRACK_FILE) else []
-    except Exception:
+    except Exception as _dege:
+        _deg("build_html:7434", _dege)
         _recs_e = []
     try:
         _cur_week = semana_trading(df.index[-1].date())
@@ -9309,7 +9423,8 @@ def build_html(df, rrg, alerts, breadth, risk, regime, buy, avoid, sources, fred
                 else:
                     s = df[sym].dropna()
                 return s if len(s) else None
-            except Exception:
+            except Exception as _dege:
+                _deg("build_html:9315", _dege)
                 return None
         def _chg(sym, n=1):
             s = _ser(sym)
@@ -9317,7 +9432,8 @@ def build_html(df, rrg, alerts, breadth, risk, regime, buy, avoid, sources, fred
                 return None
             try:
                 return float(s.iloc[-1] / s.iloc[-1 - n] - 1) * 100
-            except Exception:
+            except Exception as _dege:
+                _deg("build_html:9323", _dege)
                 return None
         def _ytd(sym):
             s = _ser(sym)
@@ -9328,7 +9444,8 @@ def build_html(df, rrg, alerts, breadth, risk, regime, buy, avoid, sources, fred
                 prev = s[s.index.year < y]
                 base = prev.iloc[-1] if len(prev) else s.iloc[0]
                 return float(s.iloc[-1] / base - 1) * 100
-            except Exception:
+            except Exception as _dege:
+                _deg("build_html:9334", _dege)
                 return None
         def _fp(v, dec=1):
             if v is None:
@@ -9409,7 +9526,21 @@ def build_html(df, rrg, alerts, breadth, risk, regime, buy, avoid, sources, fred
                         "pero estos huecos explican paneles ausentes o marcados. Detalle completo en rotacion.log junto al script. "
                         "Un build limpio no muestra este panel.</div>")
                 html.append(_mod(f"🩺 SALUD DEL BUILD — {len(SALUD_BUILD)} AVISOS (LO QUE SE DEGRADÓ Y POR QUÉ)", _sb))
-            else:
+            _dg = _deg_resumen(25)
+            if _dg:
+                _tot = sum(x[1] for x in _dg)
+                _db = ("<table><tr style='color:#888;font-size:10px'><td>funcion:linea</td>"
+                       "<td>ultimo error</td><td>veces</td></tr>")
+                for _o, _n, _e in _dg:
+                    _db += (f"<tr><td style='color:{AMB};white-space:nowrap'>{esc(_o)}</td>"
+                            f"<td style='color:#B9C9E2;font-size:10px'>{esc(_e)}</td>"
+                            f"<td style='color:{GRY}'>×{_n}</td></tr>")
+                _db += ("</table><div style='font-size:10px;color:#666;margin-top:4px'>"
+                        "Calculos que fallaron y usaron un valor de reserva SIN avisar. No son errores del build: "
+                        "son huecos que pueden explicar un numero raro. Si una fila crece de golpe respecto a otros dias, "
+                        "revisa ese calculo antes de decidir el viernes.</div>")
+                html.append(_mod(f"🔎 DEGRADACIONES SILENCIOSAS — {_tot} EN {len(_dg)} PUNTOS DE CALCULO", _db))
+            if not SALUD_BUILD:
                 html.append(_mod("🩺 SALUD DEL BUILD — LIMPIO",
                                  "<div style='color:" + GRN + ";font-size:12px'>✓ Sin incidencias: todas las fuentes respondieron y ningún dato fue descartado por los filtros de cordura.</div>"))
         except Exception:
@@ -9913,7 +10044,8 @@ def build_html(df, rrg, alerts, breadth, risk, regime, buy, avoid, sources, fred
                     if idx >= len(s):
                         idx = len(s) - 1
                     return float(s.iloc[idx])
-                except Exception:
+                except Exception as _dege:
+                    _deg("build_html:9919", _dege)
                     return None
             try:
                 _qqq_serie = nq_close if (nq_close is not None and len(nq_close.dropna())) else (df["QQQ"] if "QQQ" in df.columns else None)
@@ -10723,7 +10855,7 @@ def build_html(df, rrg, alerts, breadth, risk, regime, buy, avoid, sources, fred
 # abrir el .json directamente. Lo que no quieras regalar, no lo metas.
 # ======================================================================
 
-ESTELA_DIR = os.path.join(SITE_DIR, "estela")
+ESTELA_DIR = SITE_DIR                     # La Estela manda en la raiz del sitio
 ESTELA_JSON = os.path.join(ESTELA_DIR, "datos.json")
 
 ESTELA_MARCA = "LA ESTELA"
@@ -10934,7 +11066,8 @@ def export_estela(rrg, flow, scores, suelo, graduados, despertares, centinela,
     # --- 7) dia del ciclo semanal ---
     try:
         _dow = dt.date.today().weekday()          # 0=lunes
-    except Exception:
+    except Exception as _dege:
+        _deg("export_estela:10940", _dege)
         _dow = 0
 
     payload = {
@@ -11251,6 +11384,7 @@ def main():
             for fn in files:
                 shutil.copy2(os.path.join(root, fn), os.path.join(dest, fn))
     out = os.path.abspath(OUTPUT_HTML)
+    os.makedirs(os.path.dirname(out), exist_ok=True)   # site/pro/ puede no existir aun
     with open(out, "w", encoding="utf-8") as f:
         f.write(html)
     print(f"\nPanel generado: {out}")
@@ -11269,6 +11403,11 @@ def main():
             print(f"     · [{_o}] {_t}" + (f" (×{_n})" if _n > 1 else ""))
         if len(SALUD_BUILD) > 10:
             print(f"     · ... y {len(SALUD_BUILD) - 10} más")
+    _dg = _deg_resumen(8)
+    if _dg:
+        print(f"\n  🔎 DEGRADACIONES SILENCIOSAS: {sum(x[1] for x in _dg)} en {len(_DEG)} puntos de cálculo")
+        for _o, _n, _e in _dg:
+            print(f"     · {_o} ×{_n}  ({_e[:60]})")
     else:
         print("\n  🩺 SALUD DEL BUILD: limpio — sin datos degradados ni descartados")
     if scores:

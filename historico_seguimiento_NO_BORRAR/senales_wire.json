@@ -1754,13 +1754,13 @@
 {
 "date": "2026-08-03",
 "tag": "CLÍMAX",
-"sym": "GRID",
+"sym": "XLC",
 "dir": -1
 },
 {
 "date": "2026-08-03",
 "tag": "CLÍMAX",
-"sym": "EWP",
+"sym": "GRID",
 "dir": -1
 },
 {
@@ -1814,6 +1814,12 @@
 {
 "date": "2026-08-03",
 "tag": "GIRO",
+"sym": "XOP",
+"dir": 1
+},
+{
+"date": "2026-08-03",
+"tag": "GIRO",
 "sym": "SLV",
 "dir": 1
 },
@@ -1850,13 +1856,13 @@
 {
 "date": "2026-08-03",
 "tag": "0/3",
-"sym": "URA",
+"sym": "XME",
 "dir": 1
 },
 {
 "date": "2026-08-03",
 "tag": "0/3",
-"sym": "XME",
+"sym": "URA",
 "dir": 1
 },
 {

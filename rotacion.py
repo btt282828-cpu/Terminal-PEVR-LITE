@@ -11388,14 +11388,32 @@ def main():
     with open(out, "w", encoding="utf-8") as f:
         f.write(html)
     print(f"\nPanel generado: {out}")
-    # --- LA ESTELA: datos de la web publica. Mismo build, cero descargas extra ---
+    # --- EL TERMINAL MANDA EN LA RAIZ (v4.1) -------------------------------
+    # Antes la raiz del sitio la ocupaba la pagina publica de La Estela, que
+    # se rellenaba leyendo datos.json. Si ese JSON no salia completo, la raiz
+    # mostraba el diseno con TODOS los campos vacios y el terminal de verdad
+    # quedaba escondido en /pro/. Ahora la raiz ES el terminal completo:
+    #   ...github.io/Terminal-PeVR/        -> terminal completo
+    #   ...github.io/Terminal-PeVR/pro/    -> el mismo, para no romper enlaces
     try:
-        _est = export_estela(rrg, flow, scores, _suelo, _graduados, _despertares, _centinela,
-                             str(df.index[-1].date()), breadth=breadth, risk=risk,
-                             salud=SALUD_BUILD, momento=_momento)
-        print(f"Web publica (La Estela): {_est}")
-    except Exception as _e_est:
-        _avisar("estela", f"datos de la web publica no generados: {_e_est}")
+        _raiz = os.path.abspath(os.path.join(SITE_DIR, "index.html"))
+        with open(_raiz, "w", encoding="utf-8") as f:
+            f.write(html)
+        print(f"Terminal publicado tambien en la raiz: {_raiz}")
+    except Exception as _e_raiz:
+        _avisar("publicar", f"no se pudo escribir la raiz del sitio: {_e_raiz}")
+    # --- LA ESTELA: DESACTIVADA (v4.1) -------------------------------------
+    # La funcion export_estela() sigue en el archivo, intacta. Solo se ha
+    # dejado de LLAMAR. Para reactivarla algun dia basta con quitar el "if 0:"
+    # y devolver la raiz a la pagina publica. No se ha borrado ni un calculo.
+    if 0:   # <- poner "if 1:" para volver a publicar La Estela
+        try:
+            _est = export_estela(rrg, flow, scores, _suelo, _graduados, _despertares, _centinela,
+                                 str(df.index[-1].date()), breadth=breadth, risk=risk,
+                                 salud=SALUD_BUILD, momento=_momento)
+            print(f"Web publica (La Estela): {_est}")
+        except Exception as _e_est:
+            _avisar("estela", f"datos de la web publica no generados: {_e_est}")
     # --- resumen de salud del build (tambien queda en rotacion.log) ---
     if SALUD_BUILD:
         print(f"\n  🩺 SALUD DEL BUILD: {len(SALUD_BUILD)} avisos — detalle en la pestaña PRO y en rotacion.log")

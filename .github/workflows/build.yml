@@ -23,6 +23,11 @@ jobs:
     steps:
       - name: Descargar el repositorio
         uses: actions/checkout@v4
+        with:
+          # CORREGIDO: sin esto el runner se queda "colgado sin rama" (detached HEAD)
+          # y el git push falla con codigo 128 aunque todo lo demas haya ido bien.
+          ref: main
+          fetch-depth: 0
       - name: Preparar Python
         uses: actions/setup-python@v5
         with:
@@ -32,19 +37,40 @@ jobs:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
         run: python rotacion.py
       - name: Guardar el historico actualizado
-        # El programa reescribe historico_seguimiento_NO_BORRAR en cada ejecucion
-        # (fichas, marcador, libro). Sin este paso se perderia al terminar la maquina.
+        # El programa reescribe historico_seguimiento_NO_BORRAR ENTERO en cada
+        # ejecucion (fichas, marcador, libro). Por eso NO se debe fusionar con la
+        # version del repo: no hay nada que fusionar, el archivo de hoy ya contiene
+        # todo el historico. Antes se usaba "git pull --rebase", que intentaba
+        # mezclar dos JSON completos, chocaba, dejaba el rebase a medias y perdia
+        # el historico de esa ejecucion en silencio.
+        # Ahora: se guarda lo generado hoy, se traen los cambios remotos SIN tocar
+        # el historico, y se vuelve a poner el de hoy encima. El de hoy siempre gana.
         run: |
+          set -e
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
-          git add historico_seguimiento_NO_BORRAR || true
-          if git diff --staged --quiet; then
+          if [ -z "$(git status --porcelain historico_seguimiento_NO_BORRAR)" ]; then
             echo "Sin cambios en el historico."
-          else
-            git commit -m "historico $(date -u +%Y-%m-%d)"
-            git pull --rebase --autostash || true
-            git push
+            exit 0
           fi
+          # copia de seguridad de lo que acaba de generar el build
+          rm -rf /tmp/historico_de_hoy
+          cp -r historico_seguimiento_NO_BORRAR /tmp/historico_de_hoy
+          git checkout -- historico_seguimiento_NO_BORRAR 2>/dev/null || true
+          git clean -fd historico_seguimiento_NO_BORRAR 2>/dev/null || true
+          git fetch origin main
+          git reset --hard origin/main
+          # el historico de hoy se impone sobre lo que hubiera en el repo
+          rm -rf historico_seguimiento_NO_BORRAR
+          cp -r /tmp/historico_de_hoy historico_seguimiento_NO_BORRAR
+          git add historico_seguimiento_NO_BORRAR
+          if git diff --staged --quiet; then
+            echo "El historico ya estaba al dia."
+            exit 0
+          fi
+          git commit -m "historico $(date -u +%Y-%m-%d)"
+          git push origin HEAD:main
+          echo "Historico guardado correctamente."
       - name: Comprobar que la web se ha generado
         # Red de seguridad: si el terminal no ha escrito su HTML, es mejor que el
         # circulo se ponga ROJO aqui a que se publique una pagina vacia y te enteres
@@ -64,11 +90,8 @@ jobs:
       - name: Empaquetar la web
         uses: actions/upload-pages-artifact@v3
         with:
-          # CORREGIDO: antes ponia "site/estela", que era una carpeta antigua que
-          # ya no genera nadie. Por eso se publicaba una copia muerta con los campos
-          # vacios y /pro/ daba 404. Ahora se publica la carpeta "site" entera:
-          #   site/index.html      -> terminal completo (la raiz)
-          #   site/pro/index.html  -> el mismo, para no romper enlaces guardados
+          # site/index.html      -> terminal completo (la raiz)
+          # site/pro/index.html  -> el mismo, para no romper enlaces guardados
           path: site
   publicar:
     needs: build

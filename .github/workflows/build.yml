@@ -1,5 +1,4 @@
 name: Terminal PeVR
-
 # Cuando se ejecuta:
 #   - a mano, desde la pestana Actions (boton "Run workflow")
 #   - automatico los viernes a las 22:00 UTC (cierre de Nueva York + margen para que
@@ -9,35 +8,29 @@ on:
   workflow_dispatch:
   schedule:
     - cron: "0 22 * * 5"
-
 # Permisos: escribir en el repo (para guardar el historico actualizado) y publicar en Pages.
 permissions:
   contents: write
   pages: write
   id-token: write
-
 # Si se lanzan dos a la vez, que no se pisen.
 concurrency:
   group: terminal
   cancel-in-progress: false
-
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - name: Descargar el repositorio
         uses: actions/checkout@v4
-
       - name: Preparar Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-
       - name: Ejecutar el terminal
         env:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
         run: python rotacion.py
-
       - name: Guardar el historico actualizado
         # El programa reescribe historico_seguimiento_NO_BORRAR en cada ejecucion
         # (fichas, marcador, libro). Sin este paso se perderia al terminar la maquina.
@@ -52,15 +45,31 @@ jobs:
             git pull --rebase --autostash || true
             git push
           fi
-
+      - name: Comprobar que la web se ha generado
+        # Red de seguridad: si el terminal no ha escrito su HTML, es mejor que el
+        # circulo se ponga ROJO aqui a que se publique una pagina vacia y te enteres
+        # el viernes mirando el movil. Un HTML de verdad pesa cientos de KB.
+        run: |
+          test -f site/index.html || { echo "ERROR: no existe site/index.html"; exit 1; }
+          tam=$(stat -c%s site/index.html)
+          echo "site/index.html = $tam bytes"
+          if [ "$tam" -lt 50000 ]; then
+            echo "ERROR: el HTML es demasiado pequeno ($tam bytes). Algo ha fallado."
+            exit 1
+          fi
+          echo "Contenido que se va a publicar:"
+          ls -la site/
       - name: Preparar la publicacion
         uses: actions/configure-pages@v5
-
       - name: Empaquetar la web
         uses: actions/upload-pages-artifact@v3
         with:
-          path: site/estela
-
+          # CORREGIDO: antes ponia "site/estela", que era una carpeta antigua que
+          # ya no genera nadie. Por eso se publicaba una copia muerta con los campos
+          # vacios y /pro/ daba 404. Ahora se publica la carpeta "site" entera:
+          #   site/index.html      -> terminal completo (la raiz)
+          #   site/pro/index.html  -> el mismo, para no romper enlaces guardados
+          path: site
   publicar:
     needs: build
     runs-on: ubuntu-latest

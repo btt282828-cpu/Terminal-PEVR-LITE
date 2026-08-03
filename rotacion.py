@@ -2162,6 +2162,117 @@ def update_contrarian_ledger(sigs, px_now, datestr, df):
     return {"recs": recs, "stats": stats, "week": wk}
 
 
+
+# ======================================================================
+# FLOW SCORE y CONFIDENCE SCORE   (v4.2)
+#
+# IMPORTANTE, para que no se malinterprete lo que hacen:
+#
+#   FLOW SCORE (0-100) no es inteligencia nueva. Es la MISMA informacion de
+#   flujo que ya calcula el terminal (CMF, OBV, divergencia, volumen), puesta
+#   en una sola cifra para poder ordenar y comparar de un vistazo. Nada mas.
+#
+#   CONFIDENCE SCORE (0-100) mide CALIDAD DEL DATO, no probabilidad de acierto.
+#   Responde a "¿cuanto me puedo fiar de lo que pone en pantalla para este
+#   ETF?", NO a "¿va a subir?". Un ETF puede tener confianza 95 y caer un 20%:
+#   significaria que el dato era solido y la lectura fue clara, no que acertara.
+#   Deliberadamente NO existe aqui ningun motor de probabilidades: con ~70
+#   semanas de muestra cualquier porcentaje de acierto seria ruido con decimales.
+# ======================================================================
+
+def compute_flow_score(sym, flow):
+    """0-100 a partir del flujo YA calculado. None si no hay CMF (regla de la casa:
+       sin dato no se inventa un numero, se devuelve None)."""
+    f = (flow or {}).get(sym) or {}
+    cmf = f.get("cmf")
+    if cmf is None:
+        return None
+    det = []
+    # 1) CMF: el nucleo. -0.20..+0.20 -> 0..45 puntos
+    c = max(-0.20, min(0.20, float(cmf)))
+    p_cmf = (c + 0.20) / 0.40 * 45
+    det.append(("CMF %+.2f" % cmf, round(p_cmf, 1), 45))
+    # 2) OBV por encima de su media: el volumen acumulado acompana
+    p_obv = 15.0 if f.get("obv_above") else 0.0
+    det.append(("OBV sobre su media", p_obv, 15))
+    # 3) sin distribucion oculta (precio sube y dinero sale) -> penaliza fuerte
+    dv = f.get("diverg")
+    p_div = 0.0 if dv == "distribucion oculta" else (15.0 if dv == "acumulacion oculta" else 12.0)
+    det.append(("distribucion oculta" if dv == "distribucion oculta" else
+                ("acumulacion oculta" if dv == "acumulacion oculta" else "sin divergencia"), p_div, 15))
+    # 4) CMF girando al alza (3 tramos seguidos subiendo)
+    p_gir = 10.0 if f.get("cmf_mejora") else 0.0
+    det.append(("CMF mejorando 3 tramos", p_gir, 10))
+    # 5) volumen relativo: hay participacion detras del movimiento
+    vr = f.get("vol_rel5") or f.get("vol_rel")
+    p_vol = 0.0
+    if vr is not None:
+        p_vol = max(0.0, min(10.0, (float(vr) - 0.8) / 0.7 * 10))
+    det.append(("volumen relativo %s" % (("%.2fx" % vr) if vr is not None else "n/d"), round(p_vol, 1), 10))
+    # 6) acumulacion extranjera nocturna (solo aplica a internacionales)
+    p_ext = 5.0 if f.get("acum_ext") else 0.0
+    det.append(("acumulacion en su bolsa local", p_ext, 5))
+    total = p_cmf + p_obv + p_div + p_gir + p_vol + p_ext
+    return {"score": int(round(max(0, min(100, total)))), "det": det}
+
+
+def compute_confidence(sym, df, flow, scores_row, ultimo_cierre_dias=None):
+    """0-100 de CALIDAD DEL DATO. Cuatro bloques, todos verificables:
+         historial (30) + coherencia entre fuentes (25) + integridad (25) + frescura (20)
+       Devuelve tambien el detalle para poder ensenarlo y discutirlo."""
+    det = []
+    # --- 1) HISTORIAL: cuantas barras hay detras del calculo (max 30) ---
+    n = 0
+    try:
+        if df is not None and sym in df.columns:
+            n = int(df[sym].dropna().shape[0])
+    except Exception as _dege:
+        _deg("compute_confidence:historial", _dege)
+    p_hist = max(0.0, min(30.0, n / 104.0 * 30))     # 104 semanas (2 anos) = pleno
+    det.append(("historial: %d barras" % n, round(p_hist, 1), 30))
+    # --- 2) COHERENCIA: cuanto se ponen de acuerdo las 5 senales del scoring ---
+    #     No importa si son buenas o malas: importa que digan LO MISMO. 5-0 o 0-5
+    #     es una lectura limpia; 3-2 es un empate y no deberia inspirar confianza.
+    p_coh, txt_coh = 0.0, "sin scoring"
+    try:
+        parts = (scores_row or {}).get("parts") or []
+        if parts:
+            si = sum(1 for _, v in parts if v)
+            tot = len(parts)
+            desacuerdo = min(si, tot - si) / (tot / 2.0)      # 0 = unanime, 1 = empate
+            p_coh = (1 - desacuerdo) * 25
+            txt_coh = "coherencia %d/%d senales de acuerdo" % (max(si, tot - si), tot)
+    except Exception as _dege:
+        _deg("compute_confidence:coherencia", _dege)
+    det.append((txt_coh, round(p_coh, 1), 25))
+    # --- 3) INTEGRIDAD: ¿el dato base esta completo y no hubo fallos mudos? ---
+    f = (flow or {}).get(sym) or {}
+    p_int, faltas = 25.0, []
+    if f.get("cmf") is None:
+        p_int -= 12; faltas.append("sin CMF")
+    if not f.get("obv_spark"):
+        p_int -= 6; faltas.append("sin OBV")
+    if (f.get("vol_rel5") or f.get("vol_rel")) is None:
+        p_int -= 4; faltas.append("sin volumen")
+    try:
+        if any(sym in str(k) for k in _DEG):
+            p_int -= 3; faltas.append("hubo fallos silenciosos")
+    except Exception:
+        pass
+    p_int = max(0.0, p_int)
+    det.append(("integridad: " + (", ".join(faltas) if faltas else "dato completo"), round(p_int, 1), 25))
+    # --- 4) FRESCURA: cuantos dias hace del ultimo cierre usado ---
+    p_fresh = 20.0
+    if ultimo_cierre_dias is not None:
+        p_fresh = max(0.0, 20.0 - max(0, int(ultimo_cierre_dias) - 4) * 4.0)
+    det.append(("frescura: cierre de hace %s dias" % (ultimo_cierre_dias if ultimo_cierre_dias is not None else "?"),
+                round(p_fresh, 1), 20))
+    total = int(round(max(0, min(100, p_hist + p_coh + p_int + p_fresh))))
+    etiqueta = ("ALTA" if total >= 75 else "MEDIA" if total >= 50 else
+                "BAJA" if total >= 25 else "INSUFICIENTE")
+    return {"score": total, "etiqueta": etiqueta, "det": det, "n": n}
+
+
 def compute_scores(df, rrg, daily, flow):
     # Puntuacion 0-5 por ETF (deliverable para decidir en 5 min):
     #  +1 precio > su SMA de 40 semanas | +1 RS-momentum subiendo (vs SPY)
@@ -9545,6 +9656,50 @@ def build_html(df, rrg, alerts, breadth, risk, regime, buy, avoid, sources, fred
                                  "<div style='color:" + GRN + ";font-size:12px'>✓ Sin incidencias: todas las fuentes respondieron y ningún dato fue descartado por los filtros de cordura.</div>"))
         except Exception:
             pass
+        # --- FLOW SCORE + CONFIDENCE SCORE (v4.2) -------------------------
+        try:
+            _dias = None
+            try:
+                _dias = int((pd.Timestamp.today().normalize() - df.index[-1].normalize()).days)
+            except Exception as _dege:
+                _deg("panel_scores:dias", _dege)
+            _srow = {r["sym"]: r for r in (scores or [])}
+            _fils = []
+            for _sy in (SECTORS + THEMATIC + EXTRA):
+                _fs = compute_flow_score(_sy, flow)
+                if _fs is None:
+                    continue
+                _cf = compute_confidence(_sy, df, flow, _srow.get(_sy), _dias)
+                _fils.append((_sy, _fs, _cf))
+            if _fils:
+                _fils.sort(key=lambda x: -x[1]["score"])
+                _cols = {"ALTA": GRN, "MEDIA": AMB, "BAJA": "#C98A3A", "INSUFICIENTE": "#8A5A5A"}
+                _t = ("<table><tr style='color:#888;font-size:10px'><td>ETF</td><td>FLOW 0-100</td>"
+                      "<td>CMF</td><td>CONFIANZA EN EL DATO</td><td>barras</td></tr>")
+                for _sy, _fs, _cf in _fils[:30]:
+                    _v = _fs["score"]
+                    _fc = GRN if _v >= 65 else (AMB if _v >= 40 else RED)
+                    _cc = _cols.get(_cf["etiqueta"], GRY)
+                    _cmf = ((flow.get(_sy) or {}).get("cmf"))
+                    _t += (f"<tr><td style='font-weight:700'>{esc(_sy)}</td>"
+                           f"<td style='color:{_fc};font-weight:700'>{_v}</td>"
+                           f"<td style='color:{GRY};font-size:11px'>{_cmf:+.2f}</td>"
+                           f"<td style='color:{_cc}'>{_cf['score']} · {_cf['etiqueta']}</td>"
+                           f"<td style='color:{GRY};font-size:11px'>{_cf['n']}</td></tr>")
+                _t += ("</table><div style='font-size:10px;color:#666;margin-top:6px'>"
+                       "<b>FLOW SCORE</b> no es informacion nueva: es el mismo CMF/OBV/divergencia/volumen "
+                       "que ya ves en los otros paneles, resumido en una cifra para poder ordenar. "
+                       "<b>CONFIANZA</b> mide <b>calidad del dato</b>, NO probabilidad de acierto: cuantas barras "
+                       "hay detras (30), cuanto coinciden entre si las 5 senales del scoring (25), si el dato esta "
+                       "completo y sin fallos silenciosos (25) y si el cierre es reciente (20). "
+                       "Un ETF con confianza ALTA puede caer perfectamente: significa que la lectura era limpia, "
+                       "no que acertara. Aqui NO hay ningun motor de probabilidades, y es a proposito: con ~70 "
+                       "semanas de muestra cualquier porcentaje de acierto seria ruido con decimales. "
+                       "El flujo sigue confirmando los viernes.</div>")
+                html.append(_mod("FLOW SCORE + CONFIANZA EN EL DATO", _t))
+        except Exception as _dege:
+            _deg("panel_flow_confidence", _dege)
+            _avisar("scores", f"panel Flow/Confianza no generado: {_dege}")
         html.append(_mod("FLOW MONITOR — DÓNDE ENTRA Y SALE EL DINERO", fm))
         # --- MODULO OPTIONS DESK: put/call, IV percentil, skew, max pain y DIVERGENCIA con el CMF ---
         if options:

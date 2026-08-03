@@ -1760,7 +1760,7 @@
 {
 "date": "2026-08-03",
 "tag": "CLÍMAX",
-"sym": "XLC",
+"sym": "EWP",
 "dir": -1
 },
 {
@@ -1802,19 +1802,13 @@
 {
 "date": "2026-08-03",
 "tag": "GRADUADO",
-"sym": "BOTZ",
-"dir": 1
-},
-{
-"date": "2026-08-03",
-"tag": "GRADUADO",
 "sym": "SIL",
 "dir": 1
 },
 {
 "date": "2026-08-03",
-"tag": "GIRO",
-"sym": "XOP",
+"tag": "GRADUADO",
+"sym": "BOTZ",
 "dir": 1
 },
 {
@@ -1827,6 +1821,12 @@
 "date": "2026-08-03",
 "tag": "GIRO",
 "sym": "SLV",
+"dir": 1
+},
+{
+"date": "2026-08-03",
+"tag": "GIRO",
+"sym": "SMH",
 "dir": 1
 },
 {
@@ -1862,13 +1862,13 @@
 {
 "date": "2026-08-03",
 "tag": "0/3",
-"sym": "XME",
+"sym": "URA",
 "dir": 1
 },
 {
 "date": "2026-08-03",
 "tag": "0/3",
-"sym": "URA",
+"sym": "XME",
 "dir": 1
 },
 {

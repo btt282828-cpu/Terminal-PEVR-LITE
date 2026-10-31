@@ -504,7 +504,7 @@
 ],
 "px0": 53.07,
 "inval": 51.17,
-"cerrada": false,
+"cerrada": true,
 "macro": {
 "usd": "sube",
 "usd_ratio": 97.3,
@@ -686,6 +686,180 @@
 "china_cmf": 0.062,
 "eslabon": "C5-RETORNO",
 "cascada": "el dinero BAJA por la cadena (rota hacia energía y materia prima)"
+}
+},
+{
+"date": "2026-10-30",
+"sym": "ITA",
+"fase": "DESPERTANDO",
+"pts": 7,
+"pre": 1,
+"caida": -17.1,
+"cmf": 0.077,
+"sil": 0,
+"vr": 1.11,
+"huellas": [
+"18 pts bajo su media histórica",
+"1/3 estructurales",
+"GIRO VERTICAL 4.6× (impulso +3.8 en 3s)",
+"precio aún quieto (+0.9% en 4s): anticipación"
+],
+"px0": 209.74,
+"inval": 196.16,
+"cerrada": false,
+"macro": {
+"usd": "sube",
+"usd_ratio": 98.9,
+"usd_cmf": -0.318,
+"china": "floja",
+"china_cmf": 0.194,
+"eslabon": "C5-RETORNO",
+"cascada": "sin sentido claro"
+}
+},
+{
+"date": "2026-10-30",
+"sym": "IWM",
+"fase": "DESPERTANDO",
+"pts": 7,
+"pre": 1,
+"caida": -8.2,
+"cmf": 0.11,
+"sil": 2,
+"vr": 0.82,
+"huellas": [
+"volumen 0.82× (poca atención)",
+"GIRO VERTICAL 6.8× (impulso +4.1 en 3s)",
+"precio aún quieto (-0.8% en 4s): anticipación",
+"CMF>+0.05: el dinero ya ENTRA"
+],
+"px0": 279.33,
+"inval": 262.33,
+"cerrada": false,
+"macro": {
+"usd": "sube",
+"usd_ratio": 98.9,
+"usd_cmf": -0.318,
+"china": "floja",
+"china_cmf": 0.194,
+"eslabon": "C5-RETORNO",
+"cascada": "sin sentido claro"
+}
+},
+{
+"date": "2026-10-30",
+"sym": "KRE",
+"fase": "DESPERTANDO",
+"pts": 7,
+"pre": 1,
+"caida": -7.1,
+"cmf": -0.011,
+"sil": 2,
+"vr": 0.9,
+"huellas": [
+"volumen 0.90× (poca atención)",
+"1/3 estructurales",
+"GIRO VERTICAL 3.3× (impulso +3.1 en 3s)",
+"precio aún quieto (+1.7% en 4s): anticipación"
+],
+"px0": 72.01,
+"inval": 66.48,
+"cerrada": false,
+"macro": {
+"usd": "sube",
+"usd_ratio": 98.9,
+"usd_cmf": -0.318,
+"china": "floja",
+"china_cmf": 0.194,
+"eslabon": "C5-RETORNO",
+"cascada": "sin sentido claro"
+}
+},
+{
+"date": "2026-10-30",
+"sym": "INDA",
+"fase": "DESPERTANDO",
+"pts": 10,
+"pre": 0,
+"caida": -12.8,
+"cmf": 0.156,
+"sil": 2,
+"vr": 0.94,
+"huellas": [
+"18 pts bajo su media histórica",
+"volumen 0.94× (poca atención)",
+"8 semanas dormido en Rezagado",
+"0/3 estructurales (64-65% hist. a 4 sem)"
+],
+"px0": 47.72,
+"inval": 44.19,
+"cerrada": false,
+"macro": {
+"usd": "sube",
+"usd_ratio": 98.9,
+"usd_cmf": -0.318,
+"china": "floja",
+"china_cmf": 0.194,
+"eslabon": "C5-RETORNO",
+"cascada": "sin sentido claro"
+}
+},
+{
+"date": "2026-10-30",
+"sym": "EWG",
+"fase": "DESPERTANDO",
+"pts": 9,
+"pre": 0,
+"caida": -6.1,
+"cmf": 0.227,
+"sil": 3,
+"vr": 0.75,
+"huellas": [
+"volumen 0.75× — nadie habla de él",
+"1/3 estructurales",
+"GIRO VERTICAL 3.1× (impulso +1.9 en 3s)",
+"precio aún quieto (+1.4% en 4s): anticipación"
+],
+"px0": 41.88,
+"inval": 39.45,
+"cerrada": false,
+"macro": {
+"usd": "sube",
+"usd_ratio": 98.9,
+"usd_cmf": -0.318,
+"china": "floja",
+"china_cmf": 0.194,
+"eslabon": "C5-RETORNO",
+"cascada": "sin sentido claro"
+}
+},
+{
+"date": "2026-10-30",
+"sym": "VGK",
+"fase": "DESPERTANDO",
+"pts": 8,
+"pre": 0,
+"caida": -5.4,
+"cmf": 0.107,
+"sil": 2,
+"vr": 0.81,
+"huellas": [
+"volumen 0.81× (poca atención)",
+"1/3 estructurales",
+"GIRO VERTICAL 2.9× (impulso +1.7 en 3s)",
+"precio aún quieto (+1.3% en 4s): anticipación"
+],
+"px0": 87.54,
+"inval": 82.87,
+"cerrada": false,
+"macro": {
+"usd": "sube",
+"usd_ratio": 98.9,
+"usd_cmf": -0.318,
+"china": "floja",
+"china_cmf": 0.194,
+"eslabon": "C5-RETORNO",
+"cascada": "sin sentido claro"
 }
 }
 ]

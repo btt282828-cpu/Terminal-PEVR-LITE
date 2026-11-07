@@ -4594,5 +4594,167 @@
 "tag": "EARLY",
 "sym": "XLY",
 "dir": 1
+},
+{
+"date": "2026-11-06",
+"tag": "RÉGIMEN",
+"sym": "MERCADO",
+"dir": -1
+},
+{
+"date": "2026-11-06",
+"tag": "CLÍMAX",
+"sym": "XRT",
+"dir": -1
+},
+{
+"date": "2026-11-06",
+"tag": "CLÍMAX",
+"sym": "JETS",
+"dir": -1
+},
+{
+"date": "2026-11-06",
+"tag": "CLÍMAX",
+"sym": "FXI",
+"dir": -1
+},
+{
+"date": "2026-11-06",
+"tag": "CAPITUL",
+"sym": "EWJ",
+"dir": 1
+},
+{
+"date": "2026-11-06",
+"tag": "CAPITUL",
+"sym": "PAVE",
+"dir": 1
+},
+{
+"date": "2026-11-06",
+"tag": "CAPITUL",
+"sym": "IWM",
+"dir": 1
+},
+{
+"date": "2026-11-06",
+"tag": "NOCTURNO",
+"sym": "VGK",
+"dir": 1
+},
+{
+"date": "2026-11-06",
+"tag": "GRADUADO",
+"sym": "ITA",
+"dir": 1
+},
+{
+"date": "2026-11-06",
+"tag": "GRADUADO",
+"sym": "ITB",
+"dir": 1
+},
+{
+"date": "2026-11-06",
+"tag": "GRADUADO",
+"sym": "INDA",
+"dir": 1
+},
+{
+"date": "2026-11-06",
+"tag": "GRADUADO",
+"sym": "XLI",
+"dir": 1
+},
+{
+"date": "2026-11-06",
+"tag": "GIRO",
+"sym": "MERCADO",
+"dir": -1
+},
+{
+"date": "2026-11-06",
+"tag": "GIRO",
+"sym": "SOXX",
+"dir": -1
+},
+{
+"date": "2026-11-06",
+"tag": "GIRO",
+"sym": "SMH",
+"dir": -1
+},
+{
+"date": "2026-11-06",
+"tag": "GIRO",
+"sym": "EWY",
+"dir": -1
+},
+{
+"date": "2026-11-06",
+"tag": "RISK",
+"sym": "XTB",
+"dir": -1
+},
+{
+"date": "2026-11-06",
+"tag": "FLOW",
+"sym": "XLP",
+"dir": -1
+},
+{
+"date": "2026-11-06",
+"tag": "0/3",
+"sym": "EWG",
+"dir": 1
+},
+{
+"date": "2026-11-06",
+"tag": "0/3",
+"sym": "JETS",
+"dir": 1
+},
+{
+"date": "2026-11-06",
+"tag": "0/3",
+"sym": "FXI",
+"dir": 1
+},
+{
+"date": "2026-11-06",
+"tag": "SUELO",
+"sym": "JETS",
+"dir": 1
+},
+{
+"date": "2026-11-06",
+"tag": "SUELO",
+"sym": "FXI",
+"dir": 1
+},
+{
+"date": "2026-11-06",
+"tag": "EARLY",
+"sym": "HYDR",
+"dir": 1
+},
+{
+"date": "2026-11-06",
+"tag": "EARLY",
+"sym": "DRIV",
+"dir": 1
+},
+{
+"date": "2026-11-06",
+"tag": "EARLY",
+"sym": "XLY",
+"dir": 1
+},
+{
+"date": "2026-11-06",
+"tag": "SENT",
+"sym": "F&G",
+"dir": 1
 }
 ]

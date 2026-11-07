@@ -533,7 +533,7 @@
 ],
 "px0": 169.25,
 "inval": 161.97,
-"cerrada": false,
+"cerrada": true,
 "macro": {
 "usd": "sube",
 "usd_ratio": 97.5,
@@ -860,6 +860,64 @@
 "china_cmf": 0.194,
 "eslabon": "C5-RETORNO",
 "cascada": "sin sentido claro"
+}
+},
+{
+"date": "2026-11-06",
+"sym": "JETS",
+"fase": "DESPERTANDO",
+"pts": 8,
+"pre": 1,
+"caida": -14.8,
+"cmf": 0.064,
+"sil": 1,
+"vr": 1.09,
+"huellas": [
+"volumen 1.09×",
+"9 semanas dormido en Rezagado",
+"0/3 estructurales (64-65% hist. a 4 sem)",
+"GIRO VERTICAL 4.4× (impulso +2.7 en 3s)"
+],
+"px0": 28.36,
+"inval": 24.81,
+"cerrada": false,
+"macro": {
+"usd": "sube",
+"usd_ratio": 100.4,
+"usd_cmf": -0.062,
+"china": "floja",
+"china_cmf": 0.091,
+"eslabon": "C5-RETORNO",
+"cascada": "el dinero BAJA por la cadena (rota hacia energía y materia prima)"
+}
+},
+{
+"date": "2026-11-06",
+"sym": "FXI",
+"fase": "DESPERTANDO",
+"pts": 8,
+"pre": 0,
+"caida": -11.6,
+"cmf": 0.143,
+"sil": 0,
+"vr": 1.35,
+"huellas": [
+"13 pts bajo su media histórica",
+"0/3 estructurales (64-65% hist. a 4 sem)",
+"GIRO VERTICAL 2.5× (impulso +1.5 en 3s)",
+"precio aún quieto (+2.1% en 4s): anticipación"
+],
+"px0": 34.95,
+"inval": 31.34,
+"cerrada": false,
+"macro": {
+"usd": "sube",
+"usd_ratio": 100.4,
+"usd_cmf": -0.062,
+"china": "floja",
+"china_cmf": 0.091,
+"eslabon": "C5-RETORNO",
+"cascada": "el dinero BAJA por la cadena (rota hacia energía y materia prima)"
 }
 }
 ]
